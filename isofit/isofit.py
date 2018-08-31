@@ -49,7 +49,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('config_file')
     parser.add_argument('--row_column', default='')
-    parser.add_argument('--profile', default='')
+    parser.add_argument('--profile', action='store_true')
     args = parser.parse_args()
 
     # Setup
@@ -89,14 +89,18 @@ def main():
 
         # build geometry object
         if 'input' in config:
-            obs, loc, glt = None, None, None
+            obs, loc, glt, ds, esd = None, None, None, None, None
             if 'glt_file' in config['input']:
                 glt = s.loadtxt(config['input']['glt_file'])
             if 'obs_file' in config['input']:
                 obs = s.loadtxt(config['input']['obs_file'])
             if 'loc_file' in config['input']:
                 loc = s.loadtxt(config['input']['loc_file'])
-            geom = Geometry(obs=obs, glt=glt, loc=loc)
+            if 'date_string' in config['input']:
+                ds = config['input']['date_string']
+            if 'earth_sun_distance_file' in config['input']:
+                esd = s.loadtxt(config['input']['earth_sun_distance_file'])
+            geom = Geometry(obs=obs, glt=glt, loc=loc, ds=ds, esd=esd)
         else:
             geom = None
 
@@ -119,9 +123,9 @@ def main():
                 rdn_meas = rdn_meas * radiance_correction
             rdn_sim = None
 
-            if len(args.profile) > 0:
+            if args.profile:
                 cProfile.runctx('iv.invert(rdn_meas, geom, None)',
-                                globals(), locals())
+                                globals(), locals(), sort='tottime')
                 sys.exit(0)
 
             elif 'mcmc_inversion' in config:
@@ -280,7 +284,6 @@ def main():
         for i in lines:
 
             # Flush cache every once in a while
-            print('line %i/%i' % (i, nl))
             if meas_mm is None or i % 100 == 0:
 
                 # Refresh Radiance buffer
@@ -366,6 +369,7 @@ def main():
             mdl_frame = s.zeros((nb, ns), dtype=s.float32)
 
             for j in samps:
+                print('(%i,%i)' % (i, j))
                 try:
 
                     # Use AVIRIS-C convention?
@@ -406,7 +410,7 @@ def main():
                                     pushbroom_column=pc)
 
                     # Inversion
-                    if len(args.profile) > 0:
+                    if args.profile:
                         cProfile.runctx('iv.invert(rdn_meas, geom, None)',
                                         globals(), locals())
                         sys.exit(0)

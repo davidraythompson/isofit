@@ -203,6 +203,10 @@ class NeuralNetworkRT:
 
         return K_RT, K_surface
 
+    def get(self, x_RT, geom):
+        '''Placeholder for RT coefficients (not modeled directly)'''
+        return [s.zeros(len(self.wl),dtype=float) for q in range(4)]
+
     def summarize(self, x_RT, geom):
         '''Summary of state vector'''
         return 'Atmosphere: '+' '.join(['%5.3f' % xi for xi in x_RT])

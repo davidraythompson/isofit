@@ -25,6 +25,7 @@ from copy import deepcopy
 from scipy.linalg import block_diag, det, norm, pinv, sqrtm, inv
 from rt_modtran import ModtranRT
 from rt_libradtran import LibRadTranRT
+from rt_nn import NeuralNetworkRT
 from surf import Surface
 from surf_multicomp import MultiComponentSurface
 from surf_glint import GlintSurface
@@ -50,6 +51,9 @@ class ForwardModel:
                                 self.instrument)
         elif 'libradtran_radiative_transfer' in config:
             self.RT = LibRadTranRT(config['libradtran_radiative_transfer'],
+                                   self.instrument)
+        elif 'neural_radiative_transfer' in config:
+            self.RT = NeuralNetworkRT(config['neural_radiative_transfer'],
                                    self.instrument)
         else:
             raise ValueError('Must specify a valid radiative transfer model')
@@ -147,7 +151,7 @@ class ForwardModel:
         x_RT = x[self.RT_inds]
         x_surface = x[self.surface_inds]
         rhoatm, sphalb, transm, transup = self.RT.get(x_RT, geom)
-        coeffs = rhoatm, sphalb, transm, self.RT.solar_irr, self.RT.coszen
+        coeffs = rhoatm, sphalb, transm, self.RT.solar_irr, geom.coszen
         Ls = self.surface.calc_Ls(x_surface, geom)
         return self.RT.invert_algebraic(x_RT, rdn, Ls, geom), coeffs
 
