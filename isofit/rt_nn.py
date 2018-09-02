@@ -79,6 +79,8 @@ class NeuralNetworkRT:
                 self.fwhm)
         self.solar_irr = self.solar_irr / 10.0 # convert nW / m2 to uW / cm2  
         self.atmosphere_inputvec = s.array(config['atmosphere_inputvec'])
+        self.atm_xform = s.array(config['atmosphere_inputvec_scaling'])
+        self.rfl_xform = s.array(config['reflectance_scaling'])
 
         self.statevec = list(config['statevector'].keys())
         self.bvec = list(config['unknowns'].keys())
@@ -106,8 +108,8 @@ class NeuralNetworkRT:
             self.prior_sigma = (s.diff(self.bounds) * std_factor).flatten()
 
     def calc_rdn(self, x_RT, rfl, Ls, geom):
-        irr_scaling = self.solar_irr * geom.sundist() * geom.coszen() / s.pi
-        rdn = self.calc_rho(x_RT, rfl, Ls, geom) * irr_scaling
+        irr_scl = self.solar_irr * (geom.sundist()**2) * geom.coszen() / s.pi
+        rdn = self.calc_rho(x_RT, rfl, Ls, geom) * irr_scl
         return s.squeeze(rdn)
 
     def calc_rho(self, x_RT, rfl, Ls=None, geom=None):
@@ -129,9 +131,17 @@ class NeuralNetworkRT:
                 raise ValueError(
                     'State vector does not match NN. Needs geomdata?')
 
+        # apply pretransformation to atmosphere units
+        vmin, vmax = self.atm_xform.T
+        atm = (atm - vmin) / (vmax - vmin)
+
+        # now pretranform reflectances
+        vmin, vmax = self.rfl_xform
+        rflr = (rfl - vmin) / (vmax - vmin)
+
         # Replicate and append surface reflectance
         atm_mat = s.tile(atm, [len(rfl), 1])
-        inp     = s.hstack([atm_mat, rfl[:, s.newaxis]])
+        inp     = s.hstack([atm_mat, rflr[:, s.newaxis]])
         inp     = inp.reshape([len(rfl), n_atm+1, 1])
 
         # Feedforward with rectifying hidden and linear output layers
