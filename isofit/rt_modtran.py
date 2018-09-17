@@ -86,7 +86,7 @@ class ModtranRT(TabularRT):
                     te = i
                     break
             if ts < 0:
-                raise ValueError('Could not find solar geometry in .tp6 file')
+                raise ValueError('Could not find solar geometry in '+infile)
         szen = s.array([float(lines[i].split()[3])
                         for i in range(ts, te)]).mean()
         return szen
@@ -137,11 +137,10 @@ class ModtranRT(TabularRT):
         param = deepcopy(self.template)
 
         # Insert basic aerosol template, if needed
-        for aer_key in ['VIS', 'AERTYPE', 'AOT550', 'AOD550', 'EXT550']:
-            if aer_key in overrides.keys():
-                aerosol_template = deepcopy(
-                    json_load_ascii(self.aerosol_template))
-                param[0]['MODTRANINPUT']['AEROSOLS'] = aerosol_template
+        if any(['AERTYPE' in key for key in self.statevec]):
+            aerosol_template = deepcopy(
+                json_load_ascii(self.aerosol_template))
+            param[0]['MODTRANINPUT']['AEROSOLS'] = aerosol_template
 
         # Other overrides
         for key, val in overrides.items():

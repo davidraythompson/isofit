@@ -87,8 +87,9 @@ class Geometry:
 
     def coszen(self):
         self.dt = self.datetime
-        az, zen, ra, dec, h = sunpos(self.datetime, self.latitude, self.longitudeE,
-                                     self.surface_elevation_km * 1000.0, radians=True)
+        az, zen, ra, dec, h = sunpos(self.datetime, self.latitude, 
+                self.longitudeE, self.surface_elevation_km * 1000.0, 
+                radians=True)
         return s.cos(zen)
 
     def sundist(self):
