@@ -78,6 +78,7 @@ class SixSRT(TabularRT):
         self.sixs_grid_init = s.arange(self.wl[0], self.wl[-1]+2.5, 2.5)
         self.sixs_ngrid_init = len(self.sixs_grid_init)
         self.sixs_dir = self.find_basedir(config)
+        self.abscf_dir = config['abscf_dir']
         self.params = {'aermodel': 1,
                        'AOT550': 0.01,
                        'H2OSTR': 0,
@@ -195,10 +196,10 @@ class SixSRT(TabularRT):
 
             self.grid[i] = float(w) * 1000.0  # convert to nm
             solzens[i] = float(solzen)
-            sphalbs[i] = float(salb)
+            sphalbs[i] = float(salb) 
             transups[i] = 0.0  # float(scau)
-            transms[i] = (float(scau) + float(scad)) * float(gt)
-            rhoatms[i] = float(rhoa)
+            transms[i] = float(scau) * float(scad) * float(gt)
+            rhoatms[i] = float(rhoa) 
 
         solzen = resample_spectrum(solzens,  self.grid, self.wl, self.fwhm)
         rhoatm = resample_spectrum(rhoatms,  self.grid, self.wl, self.fwhm)
