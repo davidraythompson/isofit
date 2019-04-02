@@ -427,7 +427,7 @@ class IO:
 
             # Write a bad data flag
             state_bad = s.zeros(len(self.fm.statevec)) * -9999.0
-            data_bad = s.zeros(len(self.fm.instrument.n_chan)) * -9999.0
+            data_bad = s.zeros(self.fm.instrument.n_chan) * -9999.0
             to_write = {'estimated_state_file': state_bad,
                         'estimated_reflectance_file': data_bad,
                         'estimated_emission_file': data_bad,
@@ -614,12 +614,14 @@ class IO:
 
                 plt.subplot(1, 2, 2)
                 lamb_est = self.fm.calc_lamb(x, geom)
+                rfl_est = self.fm.calc_rfl(x, geom)
                 ymax = min(max(lamb_est)*1.25, 0.10)
                 for lo, hi in self.iv.windows:
 
                     # black line
                     idx = s.where(s.logical_and(wl > lo, wl < hi))[0]
-                    p2 = plt.plot(wl[idx], lamb_est[idx], 'k', linewidth=2)
+                    #p2 = plt.plot(wl[idx], lamb_est[idx], 'k', linewidth=2)
+                    p2 = plt.plot(wl[idx], rfl_est[idx], 'k', linewidth=2)
                     ymax = max(max(lamb_est[idx]*1.2), ymax)
 
                     # red line

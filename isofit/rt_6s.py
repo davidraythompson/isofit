@@ -66,7 +66,6 @@ sixs_template = '''0 (User defined)
 -1 No atm. corrections selected
 '''
 
-
 class SixSRT(TabularRT):
     """A model of photon transport including the atmosphere."""
 
@@ -78,7 +77,6 @@ class SixSRT(TabularRT):
         self.sixs_grid_init = s.arange(self.wl[0], self.wl[-1]+2.5, 2.5)
         self.sixs_ngrid_init = len(self.sixs_grid_init)
         self.sixs_dir = self.find_basedir(config)
-        self.abscf_dir = config['abscf_dir']
         self.params = {'aermodel': 1,
                        'AOT550': 0.01,
                        'H2OSTR': 0,
@@ -211,3 +209,5 @@ class SixSRT(TabularRT):
 
     def ext550_to_vis(self, ext550):
         return s.log(50.0) / (ext550 + 0.01159)
+
+

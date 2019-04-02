@@ -126,10 +126,13 @@ class TabularRT:
             except FileExistsError:
                 pass
 
+        # Rebuild any missing LUT files
         if len(rebuild_cmds) > 0 and self.auto_rebuild:
             logging.info("rebuilding")
             import multiprocessing
             cwd = os.getcwd()
+            if not os.path.exists(self.lut_dir):
+                os.mkdir(self.lut_dir)
             os.chdir(self.lut_dir)
             count = multiprocessing.cpu_count()
             pool = multiprocessing.Pool(processes=count)

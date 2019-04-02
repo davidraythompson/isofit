@@ -32,7 +32,7 @@ class GlintSurface(MultiComponentSurface):
         MultiComponentSurface.__init__(self, config)
         self.statevec.extend(['GLINT'])
         self.scale.extend([1.0])
-        self.init.extend([0.005])
+        self.init.extend([eps])
         self.bounds.extend([[0, 0.2]])
         self.n_state = self.n_state + 1
         self.glint_ind = len(self.statevec)-1
@@ -58,7 +58,7 @@ class GlintSurface(MultiComponentSurface):
         '''Given a reflectance estimate and one or more emissive parameters, 
           fit a state vector.'''
 
-        glint_band = s.argmin(abs(900-self.wl))
+        glint_band = s.argmin(abs(850-self.wl))
         glint = s.mean(rfl_meas[(glint_band-2):glint_band+2])
         water_band = s.argmin(abs(400-self.wl))
         water = s.mean(rfl_meas[(water_band-2):water_band+2])
