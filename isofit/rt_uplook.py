@@ -152,7 +152,6 @@ class UplookRT(TabularRT):
         self.wn_del   = (self.wn_end-self.wn_start)/float(self.n_chan-1)
         self.wn_grid  = s.linspace(self.wn_start, self.wn_end, self.n_chan)
         self.wl_grid  = 1e7 / s.flip(self.wn_grid,0)
-        print('wn step: ',self.wn_del)
         self.rfm_grid_wn = \
             s.arange(self.wn_start, self.wn_end+self.wn_del, self.wn_del)
         self.rfm_grid = 1e7 / self.rfm_grid_wn
@@ -282,7 +281,7 @@ class UplookRT(TabularRT):
 
     def load_rt(self, point, fn):
         trafile = self.lut_dir+'/'+fn
-        transm = s.loadtxt(trafile, skiprows=4)
+        transm = s.flip(s.loadtxt(trafile, skiprows=4),0)
         wl = self.wl_grid
         assert(len(wl)==len(transm))
         sol = s.ones(transm.shape) * s.pi  # to get a radiance of unity
