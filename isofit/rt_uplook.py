@@ -42,7 +42,7 @@ rfm_template = '''*HDR
 *SPC
    {wn_start} {wn_end} {wn_del} 
 *GAS
-   H2O O3 CH4 CO2 O2 NO2 NO
+   H2O O3 CH4 CO2 O2 N2O
 *ATM
    {profile_path}
 *SEC
@@ -56,10 +56,9 @@ rfm_template = '''*HDR
 *END'''
 
 rfm_script_template = '''
-origdir = `pwd`
-cd {rfm_dir}
-cp {rfm_config_path} rfm.drv
-./rfm 2&1> {rfm_log_path}
+export origdir=`pwd`
+cd {rfm_rundir_path}
+{rfm_dir}/rfm 2>&1 > {rfm_log_path}
 cd $origdir
 '''
 
@@ -146,9 +145,13 @@ class UplookRT(TabularRT):
         self.rfm_dir = self.find_basedir(config)
         self.wl, self.fwhm = load_wavelen(config['wavelength_file'])
         domain        = config['domain'] 
-        self.wn_start = 1e7 / domain['start'] 
-        self.wn_end   = 1e7 / domain['end'] 
-        self.wn_del   = self.wn_end - 1e7 / (domain['end']+domain['step'])
+        self.wn_start = 1e7 / domain['end']  # wavenumbers in reverse order :)
+        self.wn_end   = 1e7 / domain['start'] 
+        self.nsteps   = domain['end']-domain['start'] 
+        self.n_chan   = int((domain['end']-domain['start'])/domain['step'])
+        self.wn_del   = (self.wn_end-self.wn_start)/float(self.n_chan-1)
+        self.wn_grid  = s.linspace(self.wn_start, self.wn_end, self.n_chan)
+        self.wl_grid  = 1e7 / s.flip(self.wn_grid,0)
         print('wn step: ',self.wn_del)
         self.rfm_grid_wn = \
             s.arange(self.wn_start, self.wn_end+self.wn_del, self.wn_del)
@@ -220,8 +223,9 @@ class UplookRT(TabularRT):
 
         rfm_profile_fn = 'LUT_'+fn+'.atm'
         rfm_profile_path = os.path.join(self.lut_dir, 'LUT_'+fn+'.atm')
-        rfm_config_fn  = 'LUT_'+fn+'.rfm'
-        rfm_config_path = os.path.join(self.lut_dir, rfm_config_fn)
+        rfm_rundir_dn  = 'LUT_'+fn+'_rundir'
+        rfm_rundir_path = os.path.join(self.lut_dir, rfm_rundir_dn)
+        rfm_config_path = os.path.join(rfm_rundir_path, 'rfm.drv')
         rfm_script_fn  = 'LUT_'+fn+'.sh'
         rfm_script_path = os.path.join(self.lut_dir, rfm_script_fn)
         rfm_log_fn  = 'LUT_'+fn+'.log'
@@ -259,6 +263,8 @@ class UplookRT(TabularRT):
             fout.write(str(profile))
 
         # write rfm configuration file
+        if not os.path.exists(rfm_rundir_path):
+            os.mkdir(rfm_rundir_path)
         with open(rfm_config_path, 'w') as fout:
             fout.write(rfm_config_str)
 
@@ -266,8 +272,8 @@ class UplookRT(TabularRT):
         script = rfm_script_template[:]
 
         with open(rfm_script_path, 'w') as fout:
-            fout.write(script.format(rfm_dir = self.rfm_dir, 
-                        rfm_config_path = rfm_config_path,
+            fout.write(script.format(rfm_dir = self.rfm_dir,
+                        rfm_rundir_path = rfm_rundir_path,
                         rfm_log_path = rfm_log_path))
 
         # Specify the command to run the script
@@ -276,7 +282,9 @@ class UplookRT(TabularRT):
 
     def load_rt(self, point, fn):
         trafile = self.lut_dir+'/'+fn
-        wl, transm = self.load_tra(scfile)
+        transm = s.loadtxt(trafile, skiprows=4)
+        wl = self.wl_grid
+        assert(len(wl)==len(transm))
         sol = s.ones(transm.shape) * s.pi  # to get a radiance of unity
         rhoatm = s.zeros(transm.shape)
         sphalb = s.zeros(transm.shape)
