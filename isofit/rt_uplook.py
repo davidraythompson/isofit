@@ -240,8 +240,8 @@ class UplookRT(TabularRT):
         profile = Profile(self.atm_path)
         for label in profile.atm:
            for p in self.statevec:
-               if label == p+'SCL':
-                  profile.rescale(param, point[self.statevec.index(p)]) 
+               if label+'SCL' == p:
+                  profile.rescale(label, point[self.statevec.index(p)]) 
         rfm_config_str = rfm_template.format(**vals)
 
         # Check rebuild conditions: LUT is missing or from a different config
