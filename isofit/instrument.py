@@ -79,9 +79,15 @@ class Instrument:
             self.model_type = 'SNR'
             self.snr = float(config['SNR'])
 
+        elif 'snr_file' in config:
+
+            # Here, SNR is defined on a per-channel basis.
+            self.model_type = 'channelwise_snr'
+            self.snr = s.loadtxt(config['snr_file'])
+            
         elif 'parametric_noise_file' in config:
 
-            # The second option is a parametric, signal- and wavelength-
+            # The third option is a parametric, signal- and wavelength-
             # dependent noise function. This is given by a four-column
             # ASCII Text file.  Rows represent, respectively, the reference
             # wavelength, and coefficients A, B, and C that define the
@@ -97,7 +103,7 @@ class Instrument:
                                   for w in self.wl_init])
 
         elif 'pushbroom_noise_file' in config:
-            # The third option is a full pushbroom noise model that
+            # The fourth option is a full pushbroom noise model that
             # specifies noise columns and covariances independently for
             # each cross-track location via an ENVI-format binary data file.
             self.model_type = 'pushbroom'
@@ -180,7 +186,8 @@ class Instrument:
            Input: meas, the instrument measurement
            Returns: Sy, the measurement error covariance due to instrument noise"""
 
-        if self.model_type == 'SNR':
+        if self.model_type == 'SNR' or \
+                self.model_type == 'channelwise_snr':
             bad = meas < 1e-5
             meas[bad] = 1e-5
             nedl = (1.0 / self.snr) * meas
