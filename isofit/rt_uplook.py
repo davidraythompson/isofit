@@ -38,7 +38,7 @@ eps = 1e-5  # used for finite difference derivative calculations
 rfm_template = '''*HDR
 09NOV18 RFM Example: zenith transmittance
 *FLG
-   OBS ZEN TRA
+   OBS ZEN TRA CTM
 *SPC
    {wn_start} {wn_end} {wn_del} 
 *GAS
@@ -238,6 +238,10 @@ class UplookRT(TabularRT):
         vals['profile_path'] = rfm_profile_path
         vals['transmittance_path'] = rfm_output_path
         profile = Profile(self.atm_path)
+        if "OBSZEN" in self.lut_grid:
+          obszen_ind = self.lut_names.index("OBSZEN")
+          obszen = point[obszen_ind]
+          vals['airmass_factor'] =  1.0/s.cos(obszen/360.0*2*s.pi)
         for label in profile.atm:
            for p in self.statevec:
                if label+'SCL' == p:
