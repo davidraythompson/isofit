@@ -240,8 +240,8 @@ class UplookRT(TabularRT):
         profile = Profile(self.atm_path)
         if "OBSZEN" in self.lut_grid:
           obszen_ind = self.lut_names.index("OBSZEN")
-          obszen = point[obszen_ind]
-          vals['airmass_factor'] =  1.0/s.cos(obszen/360.0*2*s.pi)
+          obszen = point[obszen_ind] # MODTRAN downlooking convention 
+          vals['airmass_factor'] =  1.0/s.cos((180.0-obszen)/360.0*2*s.pi)
         for label in profile.atm:
            for p in self.statevec:
                if label+'SCL' == p:
