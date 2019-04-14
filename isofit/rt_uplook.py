@@ -89,7 +89,27 @@ atm_template = '''! FASCOD Model 2. Midlatitude Summer Atmosphere
 {O2}
 *END'''
 
-sixs_template = '''0 (User defined)
+sixs_uplook_template = '''0 (User defined)
+{viewzen} 0 {viewzen} 0 {month} {day}
+7  (User defined atmospheric profile)
+{profile_nogas_6sv}
+1
+0
+0
+-{surface_elevation_km} (target level)
+-1000 (sensor level)
+-2 
+{wl_inf}
+{wl_sup}
+0 Homogeneous surface
+0 (no directional effects)
+0
+0
+0
+-1 No atm. corrections selected
+'''
+
+sixs_airborne_template = '''0 (User defined)
 {solzen} {solaz} {viewzen} {viewaz} {month} {day}
 7  (User defined atmospheric profile)
 {profile_6sv}
@@ -98,6 +118,8 @@ sixs_template = '''0 (User defined)
 {AOT550}
 -{surface_elevation_km} (target level)
 -{observer_altitude_km} (sensor level)
+-{H2OSTR}, -{O3}
+{AOT550}
 -2 
 {wl_inf}
 {wl_sup}
@@ -171,7 +193,7 @@ class Profile:
         o3_g_per_mol, molecules_per_mol = 48.0, 6.022e23 
         return o3_g_per_mol  / molecules_per_mol * o3_molecules_per_m3
 
-    def format_6sv(self, nlev = 34):
+    def format_6sv(self, nlev = 34, gas = True):
         """Translate the profile to 6SV format""" 
         levels = [int(s.floor(q)) for q in s.linspace(0,self.atm['NLEV']-1,nlev)]
         profile = ''
@@ -181,9 +203,12 @@ class Profile:
             T        = self.atm['TEM'][lev]
             h2o_ppmv = self.atm['H2O'][lev]
             o3_ppmv  = self.atm['O3'][lev]
-            lev_str  = '%f,%f,%f,%f,%f' % (alt, P, T, 
-                    self.h2o_g_per_m3(P, T, h2o_ppmv), 
-                    self.o3_g_per_m3(P, T, o3_ppmv))
+            if gas:
+                lev_str  = '%f,%f,%f,%f,%f' % (alt, P, T, 
+                        self.h2o_g_per_m3(P, T, h2o_ppmv), 
+                        self.o3_g_per_m3(P, T, o3_ppmv))
+            else:
+                lev_str  = '%f,%f,%f,0.0,0.0' % (alt, P, T) 
             profile = profile + lev_str 
             if lev != levels[-1]:
               profile = profile + '\n'
@@ -241,6 +266,7 @@ class UplookRT(TabularRT):
         self.atm_path   = config['rfm_atm_path']
         self.observer_altitude_km = config['observer_altitude_km']
         self.surface_elevation_km = config['surface_elevation_km']
+        self.uplook_overrides = True
 
         # Wavenumber grid at superhigh resolution for RTM absorptions
         self.wn_start   = 1e7 / domain['end']  # wavenumbers in reverse order
@@ -257,11 +283,11 @@ class UplookRT(TabularRT):
         # Sixs grid, initial
         self.sixs_grid_init = s.arange(self.wl[0], self.wl[-1]+2.5, 2.5)
         self.sixs_ngrid_init = len(self.sixs_grid_init)
-        self.wl_inf =  self.sixs_grid_init[0]/1000.0  # convert to nm
-        self.wl_sup = self.sixs_grid_init[-1]/1000.0
-
-        self.AOT550     = 0
-        self.aermodel   = config['aermodel']
+        self.wl_inf     =  self.sixs_grid_init[0]/1000.0  # convert to nm
+        self.wl_sup     = self.sixs_grid_init[-1]/1000.0
+        if not self.uplook_overrides:
+            self.AOT550     = 0
+            self.aermodel   = config['aermodel']
 
         # Find the RFM installation directory
         if 'rfm_installation' in config:
@@ -339,7 +365,7 @@ class UplookRT(TabularRT):
         script_path = os.path.join(self.lut_dir, script_fn)
         rfm_log_fn  = 'LUT_'+fn+'.log'
         rfm_log_path = os.path.join(self.lut_dir, rfm_log_fn)
-        rfm_output_fn  = fn
+        rfm_output_fn  = fn+'.rfm'
         rfm_output_path = os.path.join(self.lut_dir, rfm_output_fn)
 
         # set up filenames and paths for 6SV
@@ -368,11 +394,6 @@ class UplookRT(TabularRT):
                
         # update the configuration parameters to match the LUT gridpoint
         params.update(dict([(n, v) for n, v in zip(self.lut_names, point)]))
-       
-        # For upwardlooking scattering calces, override 6SV to have solar 
-        # zenith at view zenith, sensor at TOA
-        params['observer_altitude_km'] = -1000.0
-        params['solzen'] = params['viewzen']
 
         # update the atmospheric profile
         for p in self.statevec:
@@ -383,6 +404,8 @@ class UplookRT(TabularRT):
         params['O3']     = profile.calc_column_o3()
         print('H2OSTR',params['H2OSTR'],'O3',params['O3'])
         params['profile_6sv'] = profile.format_6sv()
+        params['profile_6sv_nogas'] = profile.format_6sv(gas=False)
+        format_6sv
 
         # by convention, we always update the OBSZEN variable, but must
         # keep the others consistent
@@ -394,8 +417,11 @@ class UplookRT(TabularRT):
 
         # create the up-to-date configuration strings
         rfm_config_str  = rfm_template.format(**params)
-        sixs_config_str = sixs_template.format(**params)
         script_str      = script_template.format(**params)
+        if self.uplook_overrides:
+            sixs_config_str = sixs_uplook_template.format(**params)
+        else:
+            sixs_config_str = sixs_airborne_template.format(**params)
 
         # Rebuild if an LUT is missing 
         rebuild = False
@@ -434,16 +460,79 @@ class UplookRT(TabularRT):
         return cmd
 
     def load_rt(self, point, fn):
-        trafile = self.lut_dir+'/'+fn
-        transm = s.flip(s.loadtxt(trafile, skiprows=4),0)
-        wl = self.wl_grid
-        assert(len(wl)==len(transm))
-        sol = s.ones(transm.shape) * s.pi  # to get a radiance of unity
-        rhoatm = s.zeros(transm.shape)
-        sphalb = s.zeros(transm.shape)
+        '''Load both 6SV and RTM runs.'''
+
+        # initialize
+        sol     = s.ones(transm.shape) * s.pi  
+        rhoatm  = s.zeros(transm.shape)
+        sphalb  = s.zeros(transm.shape)
         transup = s.zeros(transm.shape)
-        solzen = 0.0
-        return wl, sol, solzen, rhoatm, transm, sphalb, transup
+
+        # set up filenames 
+        script_fn  = 'LUT_'+fn+'.sh'
+        script_path = os.path.join(self.lut_dir, script_fn)
+        rfm_output_fn  = fn+'.rfm'
+        rfm_output_path = os.path.join(self.lut_dir, rfm_output_fn)
+        sixs_config_fn = fn+'.6sv'
+        sixs_config_path = os.path.join(self.lut_dir, sixs_config_fn)
+        sixs_output_fn = fn+'.sca'
+        sixs_output_path = os.path.join(self.lut_dir, sixs_output_fn)
+
+        # load RFM gas transmissions
+        gas_xm = s.flip(s.loadtxt(rfm_output_file, skiprows=4),0)
+        wl = self.wl_grid
+        assert(len(wl)==len(gas_xm))
+        gas_xm = resample_spectrum(gas_xm, self.wl_grid, self.wl, self.fwhm)
+
+        # load 6SV solar zenith configuration 
+        with open(sixs_config_path, 'r') as l:
+            inlines = l.readlines()
+            solzen = float(inlines[1].strip().split()[0])
+
+        # load 6SV scattering and strip header
+        with open(sixs_output_path, 'r') as l:
+            lines = l.readlines()
+        for i, ln in enumerate(lines):
+            if ln.startswith('*        trans  down   up'):
+                lines = lines[(i + 1):(i + 1 + self.sixs_ngrid_init)]
+                break
+
+        solzens = s.zeros(len(lines))
+        sphalbs = s.zeros(len(lines))
+        transups = s.zeros(len(lines))
+        transms = s.zeros(len(lines))
+        rhoatms = s.zeros(len(lines))
+        self.grid = s.zeros(len(lines))
+
+        for i, ln in enumerate(lines):
+            ln = ln.replace('*', ' ').strip()
+            w, gt, scad, scau, salb, rhoa, swl, step, sbor, dsol, toar = \
+                ln.split()
+
+            self.grid[i] = float(w) * 1000.0  # convert to nm
+            solzens[i] = float(solzen)
+            sphalbs[i] = float(salb) 
+            transups[i] = 0.0  # float(scau)
+            transms[i] = float(scau) * float(scad) * float(gt)
+            rhoatms[i] = float(rhoa) 
+
+            if self.uplook_overrides:
+                transms[i] = float(scau) # one direction only
+
+        solzen  = resample_spectrum(solzens,  self.grid, self.wl, self.fwhm)
+        rhoatm  = resample_spectrum(rhoatms,  self.grid, self.wl, self.fwhm)
+        transm  = resample_spectrum(transms,  self.grid, self.wl, self.fwhm)
+        sphalb  = resample_spectrum(sphalbs,  self.grid, self.wl, self.fwhm)
+        transup = resample_spectrum(transups, self.grid, self.wl, self.fwhm)
+        irr     = resample_spectrum(self.irr, self.iwl,  self.wl, self.fwhm)
+    
+        if self.uplook_overrides:
+            transm = transm * gas_xm
+            rhoatms = rhoatms * 0.0 
+            sphalbs = sphalbs * 0.0
+
+        return self.wl, irr, solzen, rhoatm, transm, sphalb, transup
+
 
     def get(self, x_RT, geom):
         rhoatm, sphalb, transm, transup = TabularRT.get(self, x_RT, geom)
