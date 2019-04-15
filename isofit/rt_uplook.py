@@ -437,8 +437,9 @@ class UplookRT(TabularRT):
                existing_rfm = f_rfm.read()
            with open(sixs_config_path, 'r') as f_sixs:
                existing_sixs = f_sixs.read()
-           rebuild = (rfm_config_str.strip()  != existing_rfm.strip() or
-                      sixs_config_str.strip() != existing_sixs.strip())
+           if rfm_config_str.strip()  != existing_rfm.strip() or \
+              sixs_config_str.strip() != existing_sixs.strip():
+                  rebuild = True
         if not rebuild:
             raise FileExistsError('File exists')
 
@@ -494,7 +495,6 @@ class UplookRT(TabularRT):
                 lines = lines[(i + 1):(i + 1 + self.sixs_ngrid_init)]
                 break
 
-        solzens = s.zeros(len(lines))
         sphalbs = s.zeros(len(lines))
         transups = s.zeros(len(lines))
         transms = s.zeros(len(lines))
@@ -507,26 +507,25 @@ class UplookRT(TabularRT):
                 ln.split()
 
             self.grid[i] = float(w) * 1000.0  # convert to nm
-            solzens[i] = float(solzen)
             sphalbs[i] = float(salb) 
-            transups[i] = 0.0  # float(scau)
             transms[i] = float(scau) * float(scad) * float(gt)
             rhoatms[i] = float(rhoa) 
 
             if self.uplook_overrides:
                 transms[i] = float(scau) # one direction only
 
-        solzen  = resample_spectrum(solzens,  self.grid, self.wl, self.fwhm)
-        rhoatm  = resample_spectrum(rhoatms,  self.grid, self.wl, self.fwhm)
-        transm  = resample_spectrum(transms,  self.grid, self.wl, self.fwhm)
-        sphalb  = resample_spectrum(sphalbs,  self.grid, self.wl, self.fwhm)
-        transup = resample_spectrum(transups, self.grid, self.wl, self.fwhm)
         irr     = resample_spectrum(self.irr, self.iwl,  self.wl, self.fwhm)
+        transm  = resample_spectrum(transms,  self.grid, self.wl, self.fwhm)
+        transm  = transm * gas_xm
+        transup = s.zeros(transm.shape)
     
         if self.uplook_overrides:
-            transm = transm * gas_xm
-            rhoatms = rhoatms * 0.0 
-            sphalbs = sphalbs * 0.0
+            sphalb = s.zeros(transm.shape)
+            rhoatm = s.zeros(transm.shape)
+        else:
+            sphalb = resample_spectrum(sphalbs, self.grid, self.wl, self.fwhm)
+            rhoatm = resample_spectrum(rhoatms, self.grid, self.wl, self.fwhm)
+
         return self.wl, irr, solzen, rhoatm, transm, sphalb, transup
 
 
