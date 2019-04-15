@@ -27,6 +27,7 @@ import scipy as s
 import datetime
 from common import json_load_ascii, combos, VectorInterpolator
 from common import recursive_replace, load_spectrum, load_wavelen
+from common import resample_spectrum
 from copy import deepcopy
 from scipy.stats import norm as normal
 from scipy.interpolate import interp1d
@@ -55,6 +56,11 @@ rfm_template = '''*HDR
 *OUT
    TRAFIL = {rfm_output_path}
 *END'''
+
+script_template_old = '''
+{sixs_exe_path} < {sixs_config_path} > {sixs_output_path}
+'''
+
 
 script_template = '''
 export origdir=`pwd`
@@ -91,8 +97,7 @@ atm_template = '''! FASCOD Model 2. Midlatitude Summer Atmosphere
 
 sixs_uplook_template = '''0 (User defined)
 {viewzen} 0 {viewzen} 0 {month} {day}
-7  (User defined atmospheric profile)
-{profile_nogas_6sv}
+0  (No absorption)
 1
 0
 0
@@ -193,7 +198,7 @@ class Profile:
         o3_g_per_mol, molecules_per_mol = 48.0, 6.022e23 
         return o3_g_per_mol  / molecules_per_mol * o3_molecules_per_m3
 
-    def format_6sv(self, nlev = 34, gas = True):
+    def format_6sv(self, nlev = 34):
         """Translate the profile to 6SV format""" 
         levels = [int(s.floor(q)) for q in s.linspace(0,self.atm['NLEV']-1,nlev)]
         profile = ''
@@ -203,12 +208,9 @@ class Profile:
             T        = self.atm['TEM'][lev]
             h2o_ppmv = self.atm['H2O'][lev]
             o3_ppmv  = self.atm['O3'][lev]
-            if gas:
-                lev_str  = '%f,%f,%f,%f,%f' % (alt, P, T, 
-                        self.h2o_g_per_m3(P, T, h2o_ppmv), 
-                        self.o3_g_per_m3(P, T, o3_ppmv))
-            else:
-                lev_str  = '%f,%f,%f,0.0,0.0' % (alt, P, T) 
+            lev_str  = '%f,%f,%f,%f,%f' % (alt, P, T, 
+                    self.h2o_g_per_m3(P, T, h2o_ppmv), 
+                    self.o3_g_per_m3(P, T, o3_ppmv))
             profile = profile + lev_str 
             if lev != levels[-1]:
               profile = profile + '\n'
@@ -226,7 +228,6 @@ class Profile:
         ppmvs            = (h2o[1:] + h2o[:-1])/2.0
         total_column_pwv = 0
         for h2o, P, T, hgt_km in zip(ppmvs, Ps, Ts, heights):
-            print(h2o,P,T,hgt_km,total_column_pwv)
             hgt_m = hgt_km * 1000.0
             m2_per_cm2 = 1.0 / 10000.0
             pwv = self.h2o_g_per_m3(P, T, h2o) * hgt_m * m2_per_cm2
@@ -242,8 +243,8 @@ class Profile:
         ppmvs           = (o3[1:] + o3[:-1])/2.0
         total_column_o3 = 0
         for o3, P, T, hgt_km in zip(ppmvs, Ps, Ts, heights):
+            #print(o3,P,T,hgt_km,total_column_o3)
             hgt_m = hgt_km * 1000.0
-            m2_per_cm2 = 1.0 / 10000.0
             g_per_mol = 48.0 
             moles_o3_per_m2 = self.o3_g_per_m3(P, T, o3) * hgt_m  / g_per_mol
             gas_constant = 8.3144598
@@ -272,9 +273,9 @@ class UplookRT(TabularRT):
         self.wn_start   = 1e7 / domain['end']  # wavenumbers in reverse order
         self.wn_end     = 1e7 / domain['start'] 
         self.nsteps     = domain['end']-domain['start'] 
-        self.n_chan     = int((domain['end']-domain['start'])/domain['step'])
-        self.wn_del     = (self.wn_end-self.wn_start)/float(self.n_chan-1)
-        self.wn_grid    = s.linspace(self.wn_start, self.wn_end, self.n_chan)
+        self.n_chan_rfm = int((domain['end']-domain['start'])/domain['step'])
+        self.wn_del     = (self.wn_end-self.wn_start)/float(self.n_chan_rfm-1)
+        self.wn_grid    = s.linspace(self.wn_start, self.wn_end, self.n_chan_rfm)
         self.rfm_grid_wn = \
             s.arange(self.wn_start, self.wn_end + self.wn_del, self.wn_del)
         self.rfm_grid   = 1e7 / self.rfm_grid_wn
@@ -286,8 +287,9 @@ class UplookRT(TabularRT):
         self.wl_inf     =  self.sixs_grid_init[0]/1000.0  # convert to nm
         self.wl_sup     = self.sixs_grid_init[-1]/1000.0
         if not self.uplook_overrides:
-            self.AOT550     = 0
-            self.aermodel   = config['aermodel']
+            self.AOT550, self.aermodel = config['AOT550'], config['aermodel']
+        else:
+            self.AOT550, self.aermodel = 0, 0
 
         # Find the RFM installation directory
         if 'rfm_installation' in config:
@@ -383,7 +385,7 @@ class UplookRT(TabularRT):
                   'rfm_rundir_path':    rfm_rundir_path}
 
         for f in ['wn_start', 'wn_end', 'wn_del', 'hit_path', 'day', 'month',
-                  'solzen', 'solaz', 'viewzen', 'viewaz', 'AOT550', 'rfm_dir',
+                  'solzen', 'solaz', 'viewzen', 'viewaz', 'rfm_dir',
                   'sixs_dir', 'sixs_exe_path', 'aermodel', 'wl_inf', 'wl_sup', 
                   'observer_altitude_km', 'surface_elevation_km']:
             params[f] = getattr(self, f)
@@ -404,15 +406,13 @@ class UplookRT(TabularRT):
         params['O3']     = profile.calc_column_o3()
         print('H2OSTR',params['H2OSTR'],'O3',params['O3'])
         params['profile_6sv'] = profile.format_6sv()
-        params['profile_6sv_nogas'] = profile.format_6sv(gas=False)
-        format_6sv
 
         # by convention, we always update the OBSZEN variable, but must
         # keep the others consistent
         if "OBSZEN" in self.lut_grid:
           obszen_ind = self.lut_names.index("OBSZEN")
           params['viewzen'] = point[obszen_ind] # MODTRAN downlooking convention 
-        amf = 1.0/s.cos((180.0-params['viewzen'])/360.0*2*s.pi)
+        amf = 1.0/s.cos((params['viewzen'])/360.0*2*s.pi)
         params['airmass_factor'] =  amf
 
         # create the up-to-date configuration strings
@@ -435,13 +435,12 @@ class UplookRT(TabularRT):
            # Rebuild if the new configuration differs 
            with open(rfm_config_path, 'r') as f_rfm:
                existing_rfm = f_rfm.read()
-           with open(rfm_config_path, 'r') as f_sixs:
+           with open(sixs_config_path, 'r') as f_sixs:
                existing_sixs = f_sixs.read()
            rebuild = (rfm_config_str.strip()  != existing_rfm.strip() or
                       sixs_config_str.strip() != existing_sixs.strip())
-
-        # update the top-level script that will copy the RFM driver, 
-        # recover output, and run 6SV
+        if not rebuild:
+            raise FileExistsError('File exists')
 
         # set up run subdirectory and write all files
         if not os.path.exists(rfm_rundir_path):
@@ -456,33 +455,31 @@ class UplookRT(TabularRT):
             fout.write(script_str)
 
         # Specify the command to run the script
-        cmd = 'bash ' + script_path
+        cmd = 'bash ' + script_path 
         return cmd
 
     def load_rt(self, point, fn):
         '''Load both 6SV and RTM runs.'''
-
-        # initialize
-        sol     = s.ones(transm.shape) * s.pi  
-        rhoatm  = s.zeros(transm.shape)
-        sphalb  = s.zeros(transm.shape)
-        transup = s.zeros(transm.shape)
 
         # set up filenames 
         script_fn  = 'LUT_'+fn+'.sh'
         script_path = os.path.join(self.lut_dir, script_fn)
         rfm_output_fn  = fn+'.rfm'
         rfm_output_path = os.path.join(self.lut_dir, rfm_output_fn)
-        sixs_config_fn = fn+'.6sv'
+        sixs_config_fn = 'LUT_'+fn+'.6sv'
         sixs_config_path = os.path.join(self.lut_dir, sixs_config_fn)
         sixs_output_fn = fn+'.sca'
         sixs_output_path = os.path.join(self.lut_dir, sixs_output_fn)
 
         # load RFM gas transmissions
-        gas_xm = s.flip(s.loadtxt(rfm_output_file, skiprows=4),0)
+        gas_xm = s.flip(s.loadtxt(rfm_output_path, skiprows=4),0)
         wl = self.wl_grid
         assert(len(wl)==len(gas_xm))
         gas_xm = resample_spectrum(gas_xm, self.wl_grid, self.wl, self.fwhm)
+        sol     = s.ones(gas_xm.shape) * s.pi  
+        rhoatm  = s.zeros(gas_xm.shape)
+        sphalb  = s.zeros(gas_xm.shape)
+        transup = s.zeros(gas_xm.shape)
 
         # load 6SV solar zenith configuration 
         with open(sixs_config_path, 'r') as l:
@@ -530,7 +527,6 @@ class UplookRT(TabularRT):
             transm = transm * gas_xm
             rhoatms = rhoatms * 0.0 
             sphalbs = sphalbs * 0.0
-
         return self.wl, irr, solzen, rhoatm, transm, sphalb, transup
 
 

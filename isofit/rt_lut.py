@@ -144,7 +144,6 @@ class TabularRT:
         # to do: use high-res output
         self.solar_irr = None
         for point, fn in zip(self.points, self.files):
-            chnfile = self.lut_dir+'/'+fn+'.chn'
             wl, sol, solzen, rhoatm, transm, sphalb, transup = \
                 self.load_rt(point, fn)
 
