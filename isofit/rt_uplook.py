@@ -478,7 +478,6 @@ class UplookRT(TabularRT):
         wl = self.wl_grid
         assert(len(wl)==len(gas_xm))
         gas_xm  = resample_spectrum(gas_xm, self.wl_grid, self.wl, self.fwhm)
-        sol     = s.ones(gas_xm.shape) * s.pi  
         rhoatm  = s.zeros(gas_xm.shape)
         sphalb  = s.zeros(gas_xm.shape)
         transup = s.zeros(gas_xm.shape)
@@ -501,7 +500,6 @@ class UplookRT(TabularRT):
         transms = s.zeros(len(lines))
         rhoatms = s.zeros(len(lines))
         self.grid = s.zeros(len(lines))
-        irr = None  
 
         for i, ln in enumerate(lines):
             ln = ln.replace('*', ' ').strip()
@@ -520,15 +518,15 @@ class UplookRT(TabularRT):
         transm  = interp1d(self.grid, transms)(self.wl)
         transm  = transm * gas_xm
         transup = s.zeros(transm.shape)
-        if irr is None:
-          irr = resample_spectrum(self.irr, self.iwl,  self.wl, self.fwhm)
     
         if self.uplook_overrides:
             sphalb = s.zeros(transm.shape)
             rhoatm = s.zeros(transm.shape)
+            irr    = s.ones(transm.shape) * s.pi  
         else:
             sphalb  = interp1d(self.grid, sphalbs)(self.wl)
             rhoatm  = interp1d(self.grid, rhoatms)(self.wl)
+            irr = resample_spectrum(self.irr, self.iwl,  self.wl, self.fwhm)
 
         return self.wl, irr, solzen, rhoatm, transm, sphalb, transup
 
