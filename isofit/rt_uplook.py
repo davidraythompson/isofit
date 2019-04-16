@@ -282,10 +282,10 @@ class UplookRT(TabularRT):
         self.wl_grid    = 1e7 / s.flip(self.wn_grid,0) # wavelengths lo -> hi
 
         # Sixs grid, initial
-        self.sixs_grid_init = s.arange(self.wl[0], self.wl[-1]+2.5, 2.5)
-        self.sixs_ngrid_init = len(self.sixs_grid_init)
-        self.wl_inf     =  self.sixs_grid_init[0]/1000.0  # convert to nm
-        self.wl_sup     = self.sixs_grid_init[-1]/1000.0
+        sixs_grid_init  = s.arange(self.wl_grid[0], self.wl_grid[-1]+2.5, 2.5)
+        self.sixs_ngrid = len(sixs_grid_init)
+        self.wl_inf     = sixs_grid_init[0] / 1000.0 # convert to microns
+        self.wl_sup     = sixs_grid_init[-1]/ 1000.0 # convert to microns
         if not self.uplook_overrides:
             self.AOT550, self.aermodel = config['AOT550'], config['aermodel']
         else:
@@ -463,6 +463,7 @@ class UplookRT(TabularRT):
         '''Load both 6SV and RTM runs.'''
 
         # set up filenames 
+        logging.debug('Loading LUT grid point %s'%fn)
         script_fn  = 'LUT_'+fn+'.sh'
         script_path = os.path.join(self.lut_dir, script_fn)
         rfm_output_fn  = fn+'.rfm'
@@ -476,7 +477,7 @@ class UplookRT(TabularRT):
         gas_xm = s.flip(s.loadtxt(rfm_output_path, skiprows=4),0)
         wl = self.wl_grid
         assert(len(wl)==len(gas_xm))
-        gas_xm = resample_spectrum(gas_xm, self.wl_grid, self.wl, self.fwhm)
+        gas_xm  = resample_spectrum(gas_xm, self.wl_grid, self.wl, self.fwhm)
         sol     = s.ones(gas_xm.shape) * s.pi  
         rhoatm  = s.zeros(gas_xm.shape)
         sphalb  = s.zeros(gas_xm.shape)
@@ -492,7 +493,7 @@ class UplookRT(TabularRT):
             lines = l.readlines()
         for i, ln in enumerate(lines):
             if ln.startswith('*        trans  down   up'):
-                lines = lines[(i + 1):(i + 1 + self.sixs_ngrid_init)]
+                lines = lines[(i + 1):(i + 1 + self.sixs_ngrid)]
                 break
 
         sphalbs = s.zeros(len(lines))
@@ -500,6 +501,7 @@ class UplookRT(TabularRT):
         transms = s.zeros(len(lines))
         rhoatms = s.zeros(len(lines))
         self.grid = s.zeros(len(lines))
+        irr = None  
 
         for i, ln in enumerate(lines):
             ln = ln.replace('*', ' ').strip()
@@ -507,24 +509,26 @@ class UplookRT(TabularRT):
                 ln.split()
 
             self.grid[i] = float(w) * 1000.0  # convert to nm
-            sphalbs[i] = float(salb) 
-            transms[i] = float(scau) * float(scad) * float(gt)
-            rhoatms[i] = float(rhoa) 
+            sphalbs[i]   = float(salb) 
+            transms[i]   = float(scau) * float(scad) * float(gt)
+            rhoatms[i]   = float(rhoa) 
 
             if self.uplook_overrides:
                 transms[i] = float(scau) # one direction only
 
-        irr     = resample_spectrum(self.irr, self.iwl,  self.wl, self.fwhm)
-        transm  = resample_spectrum(transms,  self.grid, self.wl, self.fwhm)
+        logging.debug('Resampling LUT grid point %s'%fn)
+        transm  = interp1d(self.grid, transms)(self.wl)
         transm  = transm * gas_xm
         transup = s.zeros(transm.shape)
+        if irr is None:
+          irr = resample_spectrum(self.irr, self.iwl,  self.wl, self.fwhm)
     
         if self.uplook_overrides:
             sphalb = s.zeros(transm.shape)
             rhoatm = s.zeros(transm.shape)
         else:
-            sphalb = resample_spectrum(sphalbs, self.grid, self.wl, self.fwhm)
-            rhoatm = resample_spectrum(rhoatms, self.grid, self.wl, self.fwhm)
+            sphalb  = interp1d(self.grid, sphalbs)(self.wl)
+            rhoatm  = interp1d(self.grid, rhoatms)(self.wl)
 
         return self.wl, irr, solzen, rhoatm, transm, sphalb, transup
 
