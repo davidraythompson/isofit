@@ -49,12 +49,6 @@ class Instrument:
         self.init = []
         self.prior_sigma = []
         self.prior_mean = []
-        self.fast_resample = True
-
-        # The "fast resample" option approximates a complete resampling by a
-        # convolution with a uniform FWHM.
-        if 'fast_resample' in config:
-            self.fast_resample = config['fast_resample']
 
         # Are there free parameters?
         if 'statevector' in config:
@@ -66,6 +60,22 @@ class Instrument:
         self.prior_sigma = s.array(self.prior_sigma)
         self.prior_mean = s.array(self.prior_mean)
         self.n_state = len(self.statevec)
+
+        # Determine whether the calibration is fixed.  If it is fixed,
+        # and the wavelengths of radiative transfer modeling and instrument
+        # are the same, then we can bypass compputationally expensive sampling
+        # operations later.
+        self.calibration_fixed = (not ('GROW_FWHM' in self.statevec)) and \
+            (not ('WL_SHIFT' in self.statevec)) and \
+            (not ('WL_SPACE' in self.statevec)) and \
+            (not ('SSRF' in self.statevec))
+
+        # The "fast resample" option approximates a complete resampling by a
+        # convolution with a uniform SSRF
+        if 'fast_resample' in config:
+            self.fast_resample = config['fast_resample']
+        else:
+            self.fast_resample = True
 
         # Number of integrations comprising the measurement.  Noise diminishes
         # with the square root of this number.
@@ -161,14 +171,6 @@ class Instrument:
             if 'stray_srf_uncertainty' in unknowns:
                 self.bval[-1] = unknowns['stray_srf_uncertainty']
 
-        # Determine whether the calibration is fixed.  If it is fixed,
-        # and the wavelengths of radiative transfer modeling and instrument
-        # are the same, then we can bypass compputationally expensive sampling
-        # operations later.
-        self.calibration_fixed = (not ('FWHM_SCL' in self.statevec)) and \
-            (not ('WL_SHIFT' in self.statevec)) and \
-            (not ('WL_SPACE' in self.statevec))
-
     def xa(self):
         '''Mean of prior distribution, calculated at state x. '''
 
@@ -252,23 +254,29 @@ class Instrument:
         """ Apply instrument sampling to a radiance spectrum, returning the
             predicted measurement"""
 
-        if self.calibration_fixed and all((self.wl_init - wl_hi) < wl_tol):
-            return rdn_hi
         wl, fwhm = self.calibration(x_instrument)
-        if rdn_hi.ndim == 1:
-            return resample_spectrum(rdn_hi, wl_hi, wl, fwhm)
+        if self.calibration_fixed and all((self.wl_init - wl_hi) < wl_tol):
+            return rdn_h
+        if 'SSRF' in self.statevec:
+            ssrf = x_instrument[self.statevec.index('SSRF')]
+        else:
+            ssrf = 0
+        if rdn_hi.ndim == 1: 
+            if self.fast_resample:
+                srfv = srf(s.arange(-10, 11), 0, fwhm[0], ssrf)
+                blur = convolve(rdn_hi, srfv, mode='same')
+                return interp1d(wl_hi, blur)(wl)
+            else:
+                return resample_spectrum(rdn_hi, wl_hi, wl, fwhm, ssrf)
         else:
             resamp = []
-            # The "fast resample" option approximates a complete resampling
-            # by a convolution with a uniform FWHM.
-            if self.fast_resample:
-                for i, r in enumerate(rdn_hi):
-                    ssrf = srf(s.arange(-10, 11), 0, fwhm[0])
-                    blur = convolve(r, ssrf, mode='same')
+            for i, r in enumerate(rdn_hi):
+                if self.fast_resample:
+                    srfv = srf(s.arange(-10, 11), 0, fwhm[0], ssrf)
+                    blur = convolve(r, srfv, mode='same') 
                     resamp.append(interp1d(wl_hi, blur)(wl))
-            else:
-                for i, r in enumerate(rdn_hi):
-                    r2 = resample_spectrum(r, wl_hi, wl, fwhm)
+                else:
+                    r2 = resample_spectrum(r, wl_hi, wl, fwhm, ssrf)
                     resamp.append(r2)
             return s.array(resamp)
 

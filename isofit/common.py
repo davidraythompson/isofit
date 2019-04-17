@@ -327,10 +327,10 @@ def rdn_translate(wvn, rdn_wvn):
     return rdn_wvn*(dwl/dwvn)
 
 
-def resample_spectrum(x, wl, wl2, fwhm2, fill=False):
+def resample_spectrum(x, wl, wl2, fwhm2, fill=False, ssrf=0):
     """Resample a spectrum to a new wavelength / FWHM. 
        I assume Gaussian SRFs"""
-    H = s.array([srf(wl, wi, fwhmi/2.355)
+    H = s.array([srf(wl, wi, fwhmi/2.355, ssrf)
                  for wi, fwhmi in zip(wl2, fwhm2)])
     if fill is False:
         return s.dot(H, x[:, s.newaxis]).ravel()
@@ -359,10 +359,14 @@ def load_spectrum(init):
         return x, None
 
 
-def srf(x, mu, sigma):
+def srf(x, mu, sigma, ssrf=0):
     """Spectral Response Function """
     u = (x-mu)/abs(sigma)
     y = (1.0/(s.sqrt(2.0*s.pi)*abs(sigma)))*s.exp(-u*u/2.0)
+    if ssrf > 1e-8:
+      u = (x-mu)/abs(sigma*4.0)
+      y = y + \
+        ssrf * (1.0/(s.sqrt(2.0*s.pi)*abs(sigma*4.0)))*s.exp(-u*u/2.0)
     return y/y.sum()
 
 
