@@ -63,6 +63,8 @@ class Geometry:
             self.RELAZ = obs[1] - obs[3] + 180.0
             self.TRUEAZ = self.RELAZ  # MODTRAN convention?
             self.umu = s.cos(obs[2]/360.0*2.0*s.pi)  # Libradtran
+            logging.debug('Geometry observer OBSZEN: %f RELAZ: %f' %
+                          (self.OBSZEN, self.RELAZ))
 
         # The 'loc' object is a list-like object that optionally contains
         # latitude and longitude information about the surface being
@@ -76,11 +78,8 @@ class Geometry:
             self.longitudeE = -loc[0]
             if self.longitude < 0:
                 self.longitude = 360.0 - self.longitude
-
             logging.debug('Geometry lat: %f lon: %f' %
                           (self.latitude, self.longitude))
-            logging.debug('Geometry observer OBSZEN: %f RELAZ: %f' %
-                          (self.OBSZEN, self.RELAZ))
 
         # The ds object is an optional date object, defining the time of
         # the observation.

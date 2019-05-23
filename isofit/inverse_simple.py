@@ -22,6 +22,7 @@ import sys
 import scipy as s
 from scipy.interpolate import interp1d
 from scipy.optimize import minimize_scalar as min1d
+import pylab as plt
 
 
 def heuristic_atmosphere(RT, instrument, x_RT, x_instrument,  meas, geom):

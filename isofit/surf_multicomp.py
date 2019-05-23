@@ -38,8 +38,14 @@ class MultiComponentSurface(Surface):
 
         Surface.__init__(self, config)
 
-        # Models are stored as dictionaries in .mat format
+        # Models are stored as dictionaries in .mat format.  Be sure to 
+        # fix the one-component case where the I/O would automatically 
+        # collapse the third dimension.
         model_dict = loadmat(config['surface_file'])
+        if model_dict['means'].ndim == 1:
+          model_dict['means'] = [s.ravel(s.array([model_dict['means']]))]
+        if model_dict['covs'].ndim == 2:
+          model_dict['covs'] = [model_dict['covs']]
         self.components = list(zip(model_dict['means'], model_dict['covs']))
         self.n_comp = len(self.components)
         self.wl = model_dict['wl'][0]

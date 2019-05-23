@@ -67,7 +67,7 @@ def main():
     for wi, window in enumerate(reference_windows):
         active_wl = aand(wl >= window[0], wl < window[1])
         refwl.extend(wl[active_wl])
-    normind = s.array([s.argmin(abs(wl-w)) for w in refwl])
+    normind = s.array([s.argmin(abs(wl-w)) for w in refwl], dtype=int)
     refwl = s.array(refwl, dtype=float)
 
     # create basic model template
