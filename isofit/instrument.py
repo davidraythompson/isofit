@@ -257,7 +257,9 @@ class Instrument:
             predicted measurement"""
 
         wl, fwhm = self.calibration(x_instrument)
-        if self.calibration_fixed and all((self.wl_init - wl_hi) < wl_tol):
+        if self.calibration_fixed and \
+              (len(self.wl_init) == len(self.wl_hi)) and \
+              all((self.wl_init - wl_hi) < wl_tol):
             return rdn_hi
         if 'SSRF' in self.statevec:
             ssrf = x_instrument[self.statevec.index('SSRF')]
@@ -267,11 +269,6 @@ class Instrument:
             if self.fast_resample:
                 srfv = srf(s.arange(-10, 11), 0, fwhm[0], ssrf)
                 blur = convolve(rdn_hi, srfv, mode='same')
-               #if True:
-               #    traceback.print_stack()
-               #    plt.plot(wl_hi,rdn_hi)
-               #    plt.plot(wl,interp1d(wl_hi, blur)(wl))
-               #    plt.show(block=True)
                 return interp1d(wl_hi, blur)(wl)
             else:
                 return resample_spectrum(rdn_hi, wl_hi, wl, fwhm, ssrf)
