@@ -306,6 +306,7 @@ class Instrument:
         if 'GROW_FWHM' in self.statevec:
             ind = self.statevec.index('GROW_FWHM')
             fwhm = fwhm + x_instrument[ind]
+            print(fwhm[0])
         if 'WL_SPACE' in self.statevec:
             ind = self.statevec.index('WL_SPACE')
             space = x_instrument[ind]
@@ -324,7 +325,7 @@ class Instrument:
 
         if len(x_instrument) < 1:
             return ''
-        return 'Instrument: '+' '.join(['%5.3f' % xi for xi in x_instrument])
+        return 'Instrument: '+' '.join(['%7.5f' % xi for xi in x_instrument])
 
     def reconfigure(self, config):
         '''Reconfiguration not yet supported'''
