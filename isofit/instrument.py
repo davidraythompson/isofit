@@ -259,7 +259,7 @@ class Instrument:
         wl, fwhm = self.calibration(x_instrument)
         
         if self.calibration_fixed and \
-              (len(self.wl_init) == len(self.wl_hi)) and \
+              (len(self.wl_init) == len(wl_hi)) and \
               all((self.wl_init - wl_hi) < wl_tol):
             return rdn_hi
 
