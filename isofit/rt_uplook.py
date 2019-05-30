@@ -506,10 +506,12 @@ class UplookRT(TabularRT):
             w, gt, scad, scau, salb, rhoa, swl, step, sbor, dsol, toar = \
                 ln.split()
 
+            # the sixs radiative transfer only contributes upward scattering
+            # transmittance
             self.grid[i] = float(w) * 1000.0  # convert to nm
-            sphalbs[i]   = float(salb) 
-            transms[i]   = float(scau) * float(scad) * float(gt)
-            rhoatms[i]   = float(rhoa) 
+            #sphalbs[i]   = float(salb) 
+            transms[i]   = float(scau) #* float(scad) * float(gt)
+            #rhoatms[i]   = float(rhoa) 
 
             if self.uplook_overrides:
                 transms[i] = float(scau) # one direction only

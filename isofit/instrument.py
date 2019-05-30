@@ -257,21 +257,21 @@ class Instrument:
             predicted measurement"""
 
         wl, fwhm = self.calibration(x_instrument)
-        if self.calibration_fixed and all((self.wl_init - wl_hi) < wl_tol):
+        
+        if self.calibration_fixed and \
+              (len(self.wl_init) == len(self.wl_hi)) and \
+              all((self.wl_init - wl_hi) < wl_tol):
             return rdn_hi
+
         if 'SSRF' in self.statevec:
             ssrf = x_instrument[self.statevec.index('SSRF')]
         else:
             ssrf = 0
+        sigma_channels = (fwhm[0] / 2.355) / (wl_hi[1]-wl_hi[0])
+        srfv = srf(s.arange(-500, 501), 0, sigma_channels, ssrf)
         if rdn_hi.ndim == 1: 
             if self.fast_resample:
-                srfv = srf(s.arange(-10, 11), 0, fwhm[0], ssrf)
                 blur = convolve(rdn_hi, srfv, mode='same')
-               #if True:
-               #    traceback.print_stack()
-               #    plt.plot(wl_hi,rdn_hi)
-               #    plt.plot(wl,interp1d(wl_hi, blur)(wl))
-               #    plt.show(block=True)
                 return interp1d(wl_hi, blur)(wl)
             else:
                 return resample_spectrum(rdn_hi, wl_hi, wl, fwhm, ssrf)
@@ -279,7 +279,6 @@ class Instrument:
             resamp = []
             for i, r in enumerate(rdn_hi):
                 if self.fast_resample:
-                    srfv = srf(s.arange(-10, 11), 0, fwhm[0], ssrf)
                     blur = convolve(r, srfv, mode='same') 
                     resamp.append(interp1d(wl_hi, blur)(wl))
                 else:
