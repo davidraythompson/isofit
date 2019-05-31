@@ -305,7 +305,6 @@ class Instrument:
         if 'GROW_FWHM' in self.statevec:
             ind = self.statevec.index('GROW_FWHM')
             fwhm = fwhm + x_instrument[ind]
-            print(fwhm[0])
         if 'WL_SPACE' in self.statevec:
             ind = self.statevec.index('WL_SPACE')
             space = x_instrument[ind]

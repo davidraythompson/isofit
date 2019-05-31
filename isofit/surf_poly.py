@@ -42,7 +42,10 @@ class PolySurface:
         self.emissive = False
         self.reconfigure(config)
         self.wl, self.fwhm = load_wavelen(config['wavelength_file'])
-        self.ends=[self.wl[0],self.wl[-1]]
+        if 'domain' in config:
+          self.domain = config['domain']
+        else:
+          self.domain = [self.wl[0], self.wl[-1]]
         self.n_wl = len(self.wl)
 
     def reconfigure(self, config):
@@ -64,19 +67,20 @@ class PolySurface:
     def fit_params(self, rfl, Ls, geom):
         '''Given a directional reflectance estimate and one or more emissive 
            parameters, fit a state vector.'''
-        leg = Legendre(self.init, domain=self.ends)
-        return leg.fit(self.wl,rfl,len(self.init)-1).coef
+        leg = Legendre(self.init, domain = self.domain)
+        use = s.logical_and(self.wl<self.domain[1], self.wl>self.domain[0])
+        return leg.fit(self.wl[use], rfl[use], len(self.init)-1).coef
 
     def calc_lamb(self, x_surface, geom):
         '''Calculate a Lambertian surface reflectance for this state vector.'''
 
-        return Legendre(x_surface, domain=self.ends)(self.wl)
+        return Legendre(x_surface, domain=self.domain)(self.wl)
 
     def calc_rfl(self, x_surface, geom):
         '''Calculate the directed reflectance (specifically the HRDF) for this
            state vector.'''
 
-        return Legendre(x_surface, domain=self.ends)(self.wl)
+        return Legendre(x_surface, domain=self.domain)(self.wl)
 
     def drfl_dsurface(self, x_surface, geom):
         '''Partial derivative of reflectance with respect to state vector, 
@@ -84,12 +88,12 @@ class PolySurface:
            paramters our convention is to return the vector of zeros.'''
 
 
-        unperturb = Legendre(x_surface, domain=self.ends)(self.wl)
+        unperturb = Legendre(x_surface, domain=self.domain)(self.wl)
         drfl_dsurf = []
         for i,x in enumerate(x_surface):
           x_perturb = x_surface.copy()
           x_perturb[i] = x_surface[i] + eps 
-          drfl_dsurf.append(Legendre(x_perturb, domain=self.ends)(self.wl))
+          drfl_dsurf.append(Legendre(x_perturb, domain=self.domain)(self.wl))
         return s.array(drfl_dsurf).T
 
     def drfl_dsurfaceb(self, x_surface, geom):

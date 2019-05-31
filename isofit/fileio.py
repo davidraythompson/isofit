@@ -228,7 +228,6 @@ class IO:
         self.iv = inverse
         self.fm = forward
         self.bbl = '[]'
-        self.radiance_correction = None
         self.meas_wl = forward.instrument.wl_init
         self.meas_fwhm = forward.instrument.fwhm_init
         self.writes = 0
@@ -257,6 +256,7 @@ class IO:
                                 "rt_prior_variance_file",
                                 "instrument_prior_mean_file",
                                 "instrument_prior_variance_file",
+                                "bias_correction_file",
                                 "radiometry_correction_file"]
 
         # A list of all possible outputs.  There are several special cases
@@ -264,6 +264,11 @@ class IO:
         # "Data dump file", etc.
         wl_names = [('Channel %i' % i) for i in range(self.n_chan)]
         sv_names = self.fm.statevec.copy()
+        cov_names = []
+        for e1 in range(len(self.fm.statevec)):
+          for e2 in range(len(self.fm.statevec)):
+            cov_names.append('%i,%i'%(e1,e2))
+
         self.output_info = {
             "estimated_state_file":
                 (sv_names,
@@ -301,6 +306,10 @@ class IO:
                 (wl_names,
                  '{Wavelength (nm), Atmospheric Optical Parameters}',
                  '{}'),
+            "bias_correction_file":
+                (wl_names,
+                 '{Wavelength (nm), Radiometric Correction Factors}',
+                 '{}'),
             "radiometry_correction_file":
                 (wl_names,
                  '{Wavelength (nm), Radiometric Correction Factors}',
@@ -312,6 +321,10 @@ class IO:
             "posterior_uncertainty_file":
                 (sv_names,
                  '{State Parameter, Value}',
+                 '{}'),
+            "posterior_covariance_file":
+                (cov_names,
+                 '{}',
                  '{}')}
 
         self.defined_outputs, self.defined_inputs = {}, {}
@@ -344,10 +357,13 @@ class IO:
                                                 map_info=self.map_info, zrange=zrange,
                                                 ztitles=ztitle)
 
-        # Do we apply a radiance correction?
-        if 'radiometry_correction_file' in self.input:
-            filename = self.input['radiometry_correction_file']
-            self.radiance_correction, wl = load_spectrum(filename)
+       ## Do we apply a radiance correction
+       #if 'radiometry_correction_file' in self.input:
+       #    filename = self.input['radiometry_correction_file']
+       #    self.radiance_correction, wl = load_spectrum(filename)?
+       #if 'bias_correction_file' in self.input:
+       #    filename = self.input['bias_correction_file']
+       #    self.bias_correction, wl = load_spectrum(filename)
 
         # Last thing is to define the active image area
         if active_rows is None:
@@ -397,6 +413,9 @@ class IO:
         meas = data['measured_radiance_file']
         if data["radiometry_correction_file"] is not None:
             meas = meas.copy() * data['radiometry_correction_file']
+        if data["bias_correction_file"] is not None:
+            meas = meas.copy() + data['bias_correction_file']
+
 
         # We build the geometry object for this spectrum.  For files not
         # specified in the input configuration block, the associated entries
@@ -427,6 +446,7 @@ class IO:
 
             # Write a bad data flag
             state_bad = s.zeros(len(self.fm.statevec)) * -9999.0
+            cov_bad = s.zeros(len(self.fm.statevec)**2) * -9999.0
             data_bad = s.zeros(self.fm.instrument.n_chan) * -9999.0
             to_write = {'estimated_state_file': state_bad,
                         'estimated_reflectance_file': data_bad,
@@ -439,7 +459,8 @@ class IO:
                         'atmospheric_coefficients_file': atm_bad,
                         'radiometry_correction_file': data_bad,
                         'spectral_calibration_file': data_bad,
-                        'posterior_uncertainty_file': state_bad}
+                        'posterior_uncertainty_file': state_bad,
+                        'posterior_covariance_file': cov_bad}
 
         else:
 
@@ -524,7 +545,9 @@ class IO:
                     'spectral_calibration_file':
                         cal,
                     'posterior_uncertainty_file':
-                        s.sqrt(s.diag(S_hat))}
+                        s.sqrt(s.diag(S_hat)),
+                    'posterior_covariance_file':
+                        S_hat.copy().flatten()}
 
         for product in self.outfiles:
             logging.debug('IO: Writing '+product)
