@@ -35,8 +35,12 @@ class PolySurface:
         self.bounds = s.array([[-5,5] for i in range(self.degree+1)])
         self.init = s.array([0 for i in range(self.degree+1)])
         self.scale = s.array([1.0 for i in range(self.degree+1)])
-        self.prior_sigma = s.array([1.0 for i in range(self.degree+1)])
-        self.prior_mean = s.array([0 for i in range(self.degree+1)])
+        if 'coefficient_priors_file' in config:
+            fn = config['coefficient_priors_file']
+            self.prior_mean, self.prior_sigma = s.loadtxt(fn).T
+        else:
+            self.prior_sigma = s.array([0.1 for i in range(self.degree+1)])
+            self.prior_mean = s.array([0 for i in range(self.degree+1)])
         self.bvec = []
         self.bval = s.array([])
         self.emissive = False
