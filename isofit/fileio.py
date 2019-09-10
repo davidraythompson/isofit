@@ -37,7 +37,7 @@ typemap = {s.uint8: 1, s.int16: 2, s.int32: 3, s.float32: 4, s.float64: 5,
            s.complex64: 6, s.complex128: 9, s.uint16: 12, s.uint32: 13, s.int64: 14,
            s.uint64: 15}
 max_frames_size = 100
-flush_rate = 100
+flush_rate = 5
 
 
 class SpectrumFile:
@@ -128,6 +128,13 @@ class SpectrumFile:
                         'wavelength units': 'nm', 'z plot range': zrange,
                         'z plot titles': ztitles, 'fwhm': fwhm, 'bbl': bad_bands,
                         'band names': band_names, 'wavelength': self.wl}
+
+                # Don't write too many bands to the ASCII header
+                if len(band_names) > 1000:
+                    for todelete in ['band_names','wavelength','bbl','fwhm']:
+                        if todelete in meta: 
+                            del meta[todelete]
+
                 for k, v in meta.items():
                     if v is None:
                         logging.error('Must specify %s' % (k))
@@ -271,6 +278,16 @@ class IO:
         # "Data dump file", etc.
         wl_names = [('Channel %i' % i) for i in range(self.n_chan)]
         sv_names = self.fm.statevec.copy()
+        gain_names, jcbn_names, pcov_names, rcov_names = [],[],[],[]
+        for j in range(self.n_sv):
+            for i in range(self.n_sv):
+                pcov_names.append('%i,%i'%(j,i))
+            for i in range(self.n_chan):
+                gain_names.append('%i,%i'%(j,i))
+                jcbn_names.append('%i,%i'%(i,j))
+        for i in range(self.n_chan):
+            for i in range(self.n_chan):
+                rcov_names.append('%i,%i'%(i,j))
         self.output_info = {
             "estimated_state_file":
                 (sv_names,
@@ -319,6 +336,26 @@ class IO:
             "posterior_uncertainty_file":
                 (sv_names,
                  '{State Parameter, Value}',
+                 '{}'),
+            "posterior_covariance_file":
+                (pcov_names,
+                 '{State Parameter, Value}',
+                 '{}'),
+            "gain_matrix_file":
+                (gain_names,
+                 '{}',
+                 '{}'),
+            "jacobian_matrix_file":
+                (jcbn_names,
+                 '{}',
+                 '{}'),
+            "observation_noise_file":
+                (rcov_names,
+                 '{}',
+                 '{}'),
+            "final_prior_file":
+                (pcov_names,
+                 '{}',
                  '{}')}
 
         self.defined_outputs, self.defined_inputs = {}, {}
@@ -433,21 +470,31 @@ class IO:
         if len(states) == 0:
 
             # Write a bad data flag
+            n_chan = self.fm.instrument.n_chan
             atm_bad = s.zeros(len(self.fm.statevec)) * -9999.0
             state_bad = s.zeros(len(self.fm.statevec)) * -9999.0
-            data_bad = s.zeros(self.fm.instrument.n_chan) * -9999.0
-            to_write = {'estimated_state_file': state_bad,
-                        'estimated_reflectance_file': data_bad,
-                        'estimated_emission_file': data_bad,
-                        'modeled_radiance_file': data_bad,
-                        'apparent_reflectance_file': data_bad,
-                        'path_radiance_file': data_bad,
-                        'simulated_measurement_file': data_bad,
-                        'algebraic_inverse_file': data_bad,
-                        'atmospheric_coefficients_file': atm_bad,
-                        'radiometry_correction_file': data_bad,
-                        'spectral_calibration_file': data_bad,
-                        'posterior_uncertainty_file': state_bad}
+            data_bad  = s.zeros(n_chan) * -9999.0
+            jcbn_bad  = s.zeros(n_chan*self.fm.n_sv) * -9999.0
+            gain_bad  = s.zeros(n_chan*self.fm.n_sv) * -9999.0
+            pcov_bad  = s.zeros(self.fm.n_sv**2) * -9999.0
+            rcov_bad  = s.zeros(n_chan**2) * -9999.0
+            to_write  = {'estimated_state_file': state_bad,
+                         'estimated_reflectance_file': data_bad,
+                         'estimated_emission_file': data_bad,
+                         'modeled_radiance_file': data_bad,
+                         'apparent_reflectance_file': data_bad,
+                         'path_radiance_file': data_bad,
+                         'simulated_measurement_file': data_bad,
+                         'algebraic_inverse_file': data_bad,
+                         'atmospheric_coefficients_file': atm_bad,
+                         'radiometry_correction_file': data_bad,
+                         'spectral_calibration_file': data_bad,
+                         'posterior_uncertainty_file': state_bad,
+                         'final_prior_file': pcov_bad,
+                         'observation_noise_file': rcov_bad,
+                         'jacobian_matrix_file': jcbn_bad,
+                         'gain_matrix_file': gain_bad,
+                         'posterior_covariance_file': pcov_bad}
 
         else:
 
@@ -477,6 +524,7 @@ class IO:
 
             # Simulation with noise
             meas_sim = self.fm.instrument.simulate_measurement(meas_est, geom)
+            meas_cov = self.fm.Seps(state_est, meas, geom)
 
             # Algebraic inverse and atmospheric optical coefficients
             x_surface, x_RT, x_instrument = self.fm.unpack(state_est)
@@ -486,6 +534,9 @@ class IO:
             rhoatm, sphalb, transm, solar_irr, coszen, transup = coeffs
             atm = s.column_stack(list(coeffs[:4]) +
                                  [s.ones((len(wl), 1)) * coszen])
+
+            # prior and observation system noise
+            xa, Sa, Sa_inv, Sa_inv_sqrt = self.iv.calc_prior(state_est, geom)
 
             # Upward emission & glint and apparent reflectance
             Ls_est = self.fm.calc_Ls(state_est, geom)
@@ -531,7 +582,17 @@ class IO:
                         'spectral_calibration_file':
                         cal,
                         'posterior_uncertainty_file':
-                        s.sqrt(s.diag(S_hat))}
+                        s.sqrt(s.diag(S_hat)),
+                        'posterior_covariance_file':
+                        s.array(S_hat.flat),
+                        'jacobian_matrix_file':
+                        s.array(K.flat),
+                        'gain_matrix_file':
+                        s.array(G.flat),
+                        'observation_noise_file':
+                        s.array(meas_cov.flat),
+                        'final_prior_file':
+                        s.array(Sa.flat)}
 
         for product in self.outfiles:
             logging.debug('IO: Writing '+product)
@@ -553,13 +614,11 @@ class IO:
             Seps_inv, Seps_inv_sqrt = self.iv.calc_Seps(x, meas, geom)
             meas_est_window = meas_est[self.iv.winidx]
             meas_window = meas[self.iv.winidx]
-            xa, Sa, Sa_inv, Sa_inv_sqrt = self.iv.calc_prior(x, geom)
             prior_resid = (x - xa).dot(Sa_inv_sqrt)
             rdn_est = self.fm.calc_rdn(x, geom)
             x_surface, x_RT, x_instrument = self.fm.unpack(x)
             Kb = self.fm.Kb(x, geom)
             xinit = invert_simple(self.fm, meas, geom)
-            Sy = self.fm.instrument.Sy(meas, geom)
             cost_jac_prior = s.diagflat(x - xa).dot(Sa_inv_sqrt)
             cost_jac_meas = Seps_inv_sqrt.dot(K[self.iv.winidx, :])
             meas_Cov = self.fm.Seps(x, meas, geom)
