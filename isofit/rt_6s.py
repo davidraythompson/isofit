@@ -210,4 +210,3 @@ class SixSRT(TabularRT):
     def ext550_to_vis(self, ext550):
         return s.log(50.0) / (ext550 + 0.01159)
 
-
