@@ -509,12 +509,13 @@ class UplookRT(TabularRT):
             # the sixs radiative transfer only contributes upward scattering
             # transmittance
             self.grid[i] = float(w) * 1000.0  # convert to nm
-            #sphalbs[i]   = float(salb) 
-            transms[i]   = float(scau) #* float(scad) * float(gt)
-            #rhoatms[i]   = float(rhoa) 
 
             if self.uplook_overrides:
                 transms[i] = float(scau) # one direction only
+            else:
+                transms[i]   = float(scau) * float(scad) * float(gt)
+                sphalbs[i]   = float(salb) 
+                rhoatms[i]   = float(rhoa) 
 
         logging.debug('Resampling LUT grid point %s'%fn)
         transm  = interp1d(self.grid, transms)(self.wl)
