@@ -61,10 +61,11 @@ def main():
         isofit_path = args.isofit_path
     else:
         isofit_path = os.getenv('ISOFIT_BASE')
-    isofit_exe = join(isofit_path, 'isofit', 'isofit.py')
+    isofit_exe  = join(isofit_path, 'bin', 'isofit')
     segment_exe = join(isofit_path, 'utils', 'segment.py')
     extract_exe = join(isofit_path, 'utils', 'extract.py')
     empline_exe = join(isofit_path, 'utils', 'empline.py')
+    python_exe  = sys.executable
 
     if args.sixs_path:
         sixs_path = args.sixs_path
@@ -155,6 +156,7 @@ def main():
             os.mkdir(dpath)
 
     # stage data files by copying into working directory
+    for src, dst in [(rdn_path, rdn_working_path),
                 (obs_path, obs_working_path),
                 (loc_path, loc_working_path)]:
         if not exists(dst):
@@ -172,7 +174,7 @@ def main():
     # Superpixel segmentation
     if not exists(lbl_working_path) or not exists(rdn_working_path):
         logging.info('Segmenting...')
-        os.system('python ' + segment_exe + ' %s %s'%\
+        os.system(python_exe+' ' + segment_exe + ' %s %s'%\
                 (rdn_working_path, lbl_working_path))
 
     # Extract input data 
@@ -181,7 +183,7 @@ def main():
                       (loc_working_path, loc_subs_path)]:
         if not exists(outp):
             logging.info('Extracting '+outp)
-            os.system('python ' + extract_exe + ' %s %s %s'%\
+            os.system(python_exe+' '+ extract_exe + ' %s %s %s'%\
                     (inp, lbl_working_path, outp))
 
     # get radiance file, wavelengths
@@ -295,17 +297,18 @@ def main():
         
         # Run sixs retrieval
         logging.info('Running ISOFIT to generate h2o first guesses')
-        os.system('python ' + isofit_exe + ' --level DEBUG ' + sixs_config_path)
+        os.system(python_exe + ' ' + isofit_exe + ' --level DEBUG ' + sixs_config_path)
 
     # Extract h2o grid avoiding the zero label (periphery, bad data) 
     # and outliers
     h2o = envi.open(h2o_subs_path + '.hdr')
     h2o_est = h2o.read_band(-1)
     h2ostep = 0.2
-    h2o_sorted = s.sort(h2o_est[1:].flat)
+    h2o_flat = h2o_est[1:].reshape((len(h2o_est)-1))
+    h2o_sorted = s.sort(h2o_flat[h2o_flat>0.2])
     nseg = len(h2o_sorted)
-    h2o_lo = h2o_sorted[int(nseg*0.025)]
-    h2o_hi = h2o_sorted[int(nseg*0.975)]
+    h2o_lo = h2o_sorted[int(nseg*0.25)]
+    h2o_hi = h2o_sorted[int(nseg*0.75)]
     h2o_median = s.median(h2o_sorted)
     h2o_grid = s.arange(h2o_lo, h2o_hi+h2ostep, h2ostep)
    
@@ -391,14 +394,14 @@ def main():
             "modtran_directory": modtran_path,
             "statevector": {
               "H2OSTR": {
-                "bounds": [h2o_lo, h2o_hi],
+                "bounds": [float(h2o_lo), float(h2o_hi)],
                 "scale": 0.01,
-                "init": h2o_median,
-                "prior_sigma": (h2o_hi - h2o_lo),
-                "prior_mean": h2o_median
+                "init": float(h2o_median),
+                "prior_sigma": float(h2o_hi - h2o_lo),
+                "prior_mean": float(h2o_median)
               },
               "VIS": {
-                "bounds": [20,100],
+                "bounds": [20.0, 100.0],
                 "scale": 1,
                 "init": 20.5,
                 "prior_sigma":1000,
@@ -446,7 +449,7 @@ def main():
         
         # Run modtran retrieval
         logging.info('Running ISOFIT with full LUT')
-        cmd = 'python ' +isofit_exe+ ' --level DEBUG ' + modtran_config_path
+        cmd = python_exe + ' ' +isofit_exe+ ' --level DEBUG ' + modtran_config_path
         print(cmd)
         os.system(cmd)
 
@@ -459,7 +462,7 @@ def main():
 
         # Empirical line 
         logging.info('Empirical line inference')
-        os.system(('python ' +empline_exe+ ' --level INFO --hash %s '+\
+        os.system((python_exe + ' ' +empline_exe+ ' --level INFO --hash %s '+\
                 '%s %s %s %s %s %s %s')%\
                 (lbl_working_path, rdn_subs_path, rfl_subs_path, loc_subs_path,
                  rdn_working_path, loc_working_path, rfl_working_path,
