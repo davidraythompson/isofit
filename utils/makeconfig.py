@@ -153,42 +153,42 @@ def main():
     aerosol_mdl_path = join(isofit_path, 'data', 'aerosol_model.txt')
     aerosol_tpl_path = join(isofit_path, 'data', 'aerosol_template.json')
 
-   ## create missing directories
-   #for dpath in [wrk_path, lut_sixs_path, lut_modtran_path, config_path,
-   #              data_path, input_path, output_path]:
-   #    if not exists(dpath):
-   #        os.mkdir(dpath)
+    # create missing directories
+    for dpath in [wrk_path, lut_sixs_path, lut_modtran_path, config_path,
+                  data_path, input_path, output_path]:
+        if not exists(dpath):
+            os.mkdir(dpath)
 
-   ## stage data files by copying into working directory
-   #for src, dst in [(rdn_path, rdn_working_path),
-   #            (obs_path, obs_working_path),
-   #            (loc_path, loc_working_path)]:
-   #    if not exists(dst):
-   #        logging.info('Staging %s to %s' % (src, dst))
-   #        copyfile(src, dst)
-   #        copyfile(src+'.hdr', dst+'.hdr')
+    # stage data files by copying into working directory
+    for src, dst in [(rdn_path, rdn_working_path),
+                (obs_path, obs_working_path),
+                (loc_path, loc_working_path)]:
+        if not exists(dst):
+            logging.info('Staging %s to %s' % (src, dst))
+            copyfile(src, dst)
+            copyfile(src+'.hdr', dst+'.hdr')
 
-   ## Staging files without headers
-   #for src, dst in [(surface_path, surface_working_path),
-   #                 (surface_h2o_path, surface_h2o_working_path)]:
-   #    if not exists(dst):
-   #        logging.info('Staging %s to %s' % (src, dst))
-   #        copyfile(src, dst)
+    # Staging files without headers
+    for src, dst in [(surface_path, surface_working_path),
+                     (surface_h2o_path, surface_h2o_working_path)]:
+        if not exists(dst):
+            logging.info('Staging %s to %s' % (src, dst))
+            copyfile(src, dst)
 
-   ## Superpixel segmentation
-   #if not exists(lbl_working_path) or not exists(rdn_working_path):
-   #    logging.info('Segmenting...')
-   #    os.system(python_exe+' ' + segment_exe + ' %s %s'%\
-   #            (rdn_working_path, lbl_working_path))
+    # Superpixel segmentation
+    if not exists(lbl_working_path) or not exists(rdn_working_path):
+        logging.info('Segmenting...')
+        os.system(python_exe+' ' + segment_exe + ' %s %s'%\
+                (rdn_working_path, lbl_working_path))
 
-   ## Extract input data 
-   #for inp, outp in [(rdn_working_path, rdn_subs_path),
-   #                  (obs_working_path, obs_subs_path),
-   #                  (loc_working_path, loc_subs_path)]:
-   #    if not exists(outp):
-   #        logging.info('Extracting '+outp)
-   #        os.system(python_exe+' '+ extract_exe + ' %s %s %s'%\
-   #                (inp, lbl_working_path, outp))
+    # Extract input data 
+    for inp, outp in [(rdn_working_path, rdn_subs_path),
+                      (obs_working_path, obs_subs_path),
+                      (loc_working_path, loc_subs_path)]:
+        if not exists(outp):
+            logging.info('Extracting '+outp)
+            os.system(python_exe+' '+ extract_exe + ' %s %s %s'%\
+                    (inp, lbl_working_path, outp))
 
     # get radiance file, wavelengths
     rdn = envi.open(rdn_subs_path+'.hdr')
