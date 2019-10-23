@@ -61,10 +61,11 @@ def main():
         isofit_path = args.isofit_path
     else:
         isofit_path = os.getenv('ISOFIT_BASE')
-    isofit_exe  = join(isofit_path, 'bin', 'isofit')
-    segment_exe = join(isofit_path, 'utils', 'segment.py')
-    extract_exe = join(isofit_path, 'utils', 'extract.py')
-    empline_exe = join(isofit_path, 'utils', 'empline.py')
+    isofit_exe   = join(isofit_path, 'bin', 'isofit')
+    segment_exe  = join(isofit_path, 'utils', 'segment.py')
+    extract_exe  = join(isofit_path, 'utils', 'extract.py')
+    empline_exe  = join(isofit_path, 'utils', 'empline.py')
+    resample_exe = join(isofit_path, 'utils', 'resample.py')
     python_exe  = sys.executable
 
     if args.sixs_path:
@@ -87,7 +88,7 @@ def main():
     else:
         surface_h2o_path = os.getenv('ISOFIT_SURFACE_H2O_MODEL')
 
-    wrk_path = args.working_directory
+    wrk_path = abspath(args.working_directory)
     rdn_path = args.input_radiance
     loc_path = args.input_loc
     obs_path = args.input_obs
@@ -123,6 +124,7 @@ def main():
     rfl_subs_fname       = rfl_fname.replace('_rfl','_subs_rfl')
     state_subs_fname     = rfl_fname.replace('_rfl','_subs_state')
     uncert_subs_fname    = rfl_fname.replace('_rfl','_subs_uncert')
+    resamp_subs_fname    = rdn_fname.replace('_rdn','_subs_resamp')
     h2o_subs_fname       = loc_fname.replace('_loc','_subs_h2o')
     rdn_working_path     = abspath(join(input_path,  rdn_fname))
     obs_working_path     = abspath(join(input_path,  obs_fname))
@@ -131,6 +133,7 @@ def main():
     uncert_working_path  = abspath(join(output_path, uncert_fname))
     lbl_working_path     = abspath(join(output_path, lbl_fname))
     rdn_subs_path        = abspath(join(input_path,  rdn_subs_fname))
+    resamp_subs_path     = abspath(join(input_path,  resamp_subs_fname))
     obs_subs_path        = abspath(join(input_path,  obs_subs_fname))
     loc_subs_path        = abspath(join(input_path,  loc_subs_fname))
     rfl_subs_path        = abspath(join(output_path, rfl_subs_fname))
@@ -140,6 +143,7 @@ def main():
     surface_working_path = abspath(join(data_path,   'surface.mat'))
     surface_h2o_working_path = abspath(join(data_path, 'surface_h2o.mat'))
     wl_path = abspath(join(data_path,   'wavelengths.txt'))
+    resamp_wl_path = join(isofit_path, 'data','mas_wavelengths.txt')
     modtran_tpl_path = abspath(join(config_path, fid+'_modtran_tpl.json'))
     modtran_config_path = abspath(join(config_path, fid+'_modtran.json'))
     sixs_config_path = abspath(join(config_path, fid+'_sixs.json'))
@@ -149,42 +153,42 @@ def main():
     aerosol_mdl_path = join(isofit_path, 'data', 'aerosol_model.txt')
     aerosol_tpl_path = join(isofit_path, 'data', 'aerosol_template.json')
 
-    # create missing directories
-    for dpath in [wrk_path, lut_sixs_path, lut_modtran_path, config_path,
-                  data_path, input_path, output_path]:
-        if not exists(dpath):
-            os.mkdir(dpath)
+   ## create missing directories
+   #for dpath in [wrk_path, lut_sixs_path, lut_modtran_path, config_path,
+   #              data_path, input_path, output_path]:
+   #    if not exists(dpath):
+   #        os.mkdir(dpath)
 
-    # stage data files by copying into working directory
-    for src, dst in [(rdn_path, rdn_working_path),
-                (obs_path, obs_working_path),
-                (loc_path, loc_working_path)]:
-        if not exists(dst):
-            logging.info('Staging %s to %s' % (src, dst))
-            copyfile(src, dst)
-            copyfile(src+'.hdr', dst+'.hdr')
+   ## stage data files by copying into working directory
+   #for src, dst in [(rdn_path, rdn_working_path),
+   #            (obs_path, obs_working_path),
+   #            (loc_path, loc_working_path)]:
+   #    if not exists(dst):
+   #        logging.info('Staging %s to %s' % (src, dst))
+   #        copyfile(src, dst)
+   #        copyfile(src+'.hdr', dst+'.hdr')
 
-    # Staging files without headers
-    for src, dst in [(surface_path, surface_working_path),
-                     (surface_h2o_path, surface_h2o_working_path)]:
-        if not exists(dst):
-            logging.info('Staging %s to %s' % (src, dst))
-            copyfile(src, dst)
+   ## Staging files without headers
+   #for src, dst in [(surface_path, surface_working_path),
+   #                 (surface_h2o_path, surface_h2o_working_path)]:
+   #    if not exists(dst):
+   #        logging.info('Staging %s to %s' % (src, dst))
+   #        copyfile(src, dst)
 
-    # Superpixel segmentation
-    if not exists(lbl_working_path) or not exists(rdn_working_path):
-        logging.info('Segmenting...')
-        os.system(python_exe+' ' + segment_exe + ' %s %s'%\
-                (rdn_working_path, lbl_working_path))
+   ## Superpixel segmentation
+   #if not exists(lbl_working_path) or not exists(rdn_working_path):
+   #    logging.info('Segmenting...')
+   #    os.system(python_exe+' ' + segment_exe + ' %s %s'%\
+   #            (rdn_working_path, lbl_working_path))
 
-    # Extract input data 
-    for inp, outp in [(rdn_working_path, rdn_subs_path),
-                      (obs_working_path, obs_subs_path),
-                      (loc_working_path, loc_subs_path)]:
-        if not exists(outp):
-            logging.info('Extracting '+outp)
-            os.system(python_exe+' '+ extract_exe + ' %s %s %s'%\
-                    (inp, lbl_working_path, outp))
+   ## Extract input data 
+   #for inp, outp in [(rdn_working_path, rdn_subs_path),
+   #                  (obs_working_path, obs_subs_path),
+   #                  (loc_working_path, loc_subs_path)]:
+   #    if not exists(outp):
+   #        logging.info('Extracting '+outp)
+   #        os.system(python_exe+' '+ extract_exe + ' %s %s %s'%\
+   #                (inp, lbl_working_path, outp))
 
     # get radiance file, wavelengths
     rdn = envi.open(rdn_subs_path+'.hdr')
@@ -252,6 +256,12 @@ def main():
                              fwhm[:, s.newaxis]], axis=1)
     s.savetxt(wl_path, wl_data, delimiter=' ')
 
+    if not exists(resamp_subs_path + '.hdr') or not exists(resamp_subs_path):
+         # Resample for initial H2O guess
+        logging.info('Resampling to H2O first guess channels')
+        os.system(python_exe + ' ' + resample_exe + ' -w ' + wl_path + ' ' +\
+                  rdn_subs_path + ' ' + resamp_wl_path + ' ' + resamp_subs_path)
+
     if not exists(h2o_subs_path + '.hdr') or not exists(h2o_subs_path):
 
         # make sixs configuration
@@ -262,7 +272,7 @@ def main():
             "lut_grid": { "H2OSTR": [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 
                 4.5, 5.0, 5.5, 6.0]},
             "unknowns": {},
-            "wavelength_file": wl_path,
+            "wavelength_file": resamp_wl_path,
             "earth_sun_distance_file" : esd_path, 
             "irradiance_file" : irradiance_path,
             "sixs_installation": sixs_path,
@@ -278,18 +288,19 @@ def main():
         
         # make isofit configuration
         isofit_config_sixs = {'ISOFIT_base': isofit_path,
-            'input':{'measured_radiance_file':rdn_subs_path,
+            'input':{'measured_radiance_file':resamp_subs_path,
                      'loc_file':loc_subs_path,
                      'obs_file':obs_subs_path},
             'output':{'estimated_state_file':h2o_subs_path},
             'forward_model': {
-                'instrument': { 'wavelength_file': wl_path,
-                'parametric_noise_file': noise_path,
+                'instrument': { 'wavelength_file': resamp_wl_path,
+                'SNR': 200,
                 'integrations':1 },
-            "multicomponent_surface": {"wavelength_file":wl_path,
+            "multicomponent_surface": {"wavelength_file":resamp_wl_path,
                 "surface_file":surface_h2o_working_path},
             "sixs_radiative_transfer": sixs_configuration},
-            "inversion": {"windows": [[880.0,1000.0]], 'max_nfev': 10}}
+            "inversion": {"windows": [[800.0,1000.0]], 
+                          'max_nfev': 1}}
         
         # write sixs configuration
         with open(sixs_config_path,'w') as fout:
@@ -297,8 +308,10 @@ def main():
         
         # Run sixs retrieval
         logging.info('Running ISOFIT to generate h2o first guesses')
-        os.system(python_exe + ' ' + isofit_exe + ' --level DEBUG ' + sixs_config_path)
+        os.system(python_exe + ' ' + isofit_exe + \
+            ' --level DEBUG ' + sixs_config_path)
 
+    sys.exit(0)
     # Extract h2o grid avoiding the zero label (periphery, bad data) 
     # and outliers
     h2o = envi.open(h2o_subs_path + '.hdr')
@@ -312,9 +325,10 @@ def main():
     h2o_median = s.median(h2o_sorted)
     h2o_grid = s.arange(h2o_lo, h2o_hi+h2ostep, h2ostep)
    
+    logging.info(state_subs_path)
     if not exists(state_subs_path) or \
-            not exists(uncert_subs_path) or \
-            not exists(rfl_subs_path):
+           not exists(uncert_subs_path) or \
+           not exists(rfl_subs_path):
 
         atmosphere_type = 'ATM_MIDLAT_SUMMER'
         
@@ -394,18 +408,18 @@ def main():
             "modtran_directory": modtran_path,
             "statevector": {
               "H2OSTR": {
-                "bounds": [float(h2o_lo), float(h2o_hi)],
+                "bounds": [h2o_grid[0], h2o_grid[-1]],
                 "scale": 0.01,
-                "init": float(h2o_median),
-                "prior_sigma": float(h2o_hi - h2o_lo),
-                "prior_mean": float(h2o_median)
+                "init": (h2o_grid[1]+h2o_grid[-1])/2.0,
+                "prior_sigma": 100.0,
+                "prior_mean": (h2o_grid[1]+h2o_grid[-1])/2.0,
               },
               "VIS": {
                 "bounds": [20.0, 100.0],
                 "scale": 1,
-                "init": 20.5,
+                "init": 75.0,
                 "prior_sigma":1000,
-                "prior_mean":20
+                "prior_mean":50
               }
             },
             "lut_grid": {
@@ -440,7 +454,7 @@ def main():
                 [2000.0,2450.0]]}}
         
         if args.rdn_factors_path:
-            isofit_config_modtran['input']['radiommetry_correction_file'] = \
+            isofit_config_modtran['input']['radiometry_correction_file'] = \
                 args.rdn_factors_path
         
         # write modtran_template 

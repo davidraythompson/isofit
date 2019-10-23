@@ -306,3 +306,21 @@ class ForwardModel:
         self.instrument.reconfigure(config_instrument)
         self.init = s.concatenate((self.surface.init, self.RT.init,
                                    self.instrument.init))
+
+    def make_inbounds(self, x, geom):
+        """Nudge the state vector to ensure it is in the valid ranges for all
+        components"""
+
+        x_surface, x_RT, x_instrument = self.unpack(x)
+        bound_lwr = self.bounds[0]
+        bound_upr = self.bounds[1]
+        xnew = x.copy()
+        xnew[self.idx_surface] = s.maximum(s.minimum(x_surface.copy(), 
+                                bound_upr[self.idx_surface] - eps*3.0),
+                                bound_lwr[self.idx_surface] + eps*3.0)
+
+        xnew[self.idx_RT] = s.maximum(s.minimum(x_RT.copy(), 
+                                bound_upr[self.idx_RT] - eps*3.0),
+                                bound_lwr[self.idx_RT] + eps*3.0)
+        return xnew
+      

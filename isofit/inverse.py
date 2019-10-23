@@ -160,7 +160,9 @@ class Inversion:
             return s.array([self.fm.init.copy()])
 
         # Calculate the initial solution, if needed.
+        # Clip to relevant ranges if needed. 
         x0 = invert_simple(self.fm, meas, geom)
+        x0 = self.fm.make_inbounds(x0, geom)
 
         # Seps is the covariance of "observation noise" including both
         # measurement noise from the instrument as well as variability due to
