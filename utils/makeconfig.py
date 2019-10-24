@@ -49,6 +49,7 @@ def main():
     parser.add_argument('--modtran_path', type=str)
     parser.add_argument('--sixs_path', type=str)
     parser.add_argument('--wavelength_path', type=str)
+    parser.add_argument('--wavelength_h2o_path', type=str)
     parser.add_argument('--rdn_factors_path', type=str)
     parser.add_argument('--surface_path', type=str)
     parser.add_argument('--surface_h2o_path', type=str)
@@ -87,6 +88,11 @@ def main():
         surface_h2o_path = args.surface_h2o_path
     else:
         surface_h2o_path = os.getenv('ISOFIT_SURFACE_H2O_MODEL')
+
+    if args.wavelength_h2o_path:
+        resamp_wl_path = args.wavelength_h2o_path
+    else:
+        resamp_wl_path = join(isofit_path, 'data','mas_wavelengths.txt')
 
     wrk_path = abspath(args.working_directory)
     rdn_path = args.input_radiance
@@ -143,7 +149,6 @@ def main():
     surface_working_path = abspath(join(data_path,   'surface.mat'))
     surface_h2o_working_path = abspath(join(data_path, 'surface_h2o.mat'))
     wl_path = abspath(join(data_path,   'wavelengths.txt'))
-    resamp_wl_path = join(isofit_path, 'data','mas_wavelengths.txt')
     modtran_tpl_path = abspath(join(config_path, fid+'_modtran_tpl.json'))
     modtran_config_path = abspath(join(config_path, fid+'_modtran.json'))
     sixs_config_path = abspath(join(config_path, fid+'_sixs.json'))
@@ -311,7 +316,7 @@ def main():
         os.system(python_exe + ' ' + isofit_exe + \
             ' --level DEBUG ' + sixs_config_path)
 
-    sys.exit(0)
+    
     # Extract h2o grid avoiding the zero label (periphery, bad data) 
     # and outliers
     h2o = envi.open(h2o_subs_path + '.hdr')
@@ -320,8 +325,8 @@ def main():
     h2o_flat = h2o_est[1:].reshape((len(h2o_est)-1))
     h2o_sorted = s.sort(h2o_flat[h2o_flat>0.2])
     nseg = len(h2o_sorted)
-    h2o_lo = h2o_sorted[int(nseg*0.25)]
-    h2o_hi = h2o_sorted[int(nseg*0.75)]
+    h2o_lo = h2o_sorted[int(nseg*0.25)]-2.0*h2ostep
+    h2o_hi = h2o_sorted[int(nseg*0.75)]+2.0*h2ostep
     h2o_median = s.median(h2o_sorted)
     h2o_grid = s.arange(h2o_lo, h2o_hi+h2ostep, h2ostep)
    
