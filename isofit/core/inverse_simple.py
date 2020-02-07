@@ -34,7 +34,7 @@ def heuristic_atmosphere(RT, instrument, x_RT, x_instrument,  meas, geom):
     b865 = s.argmin(abs(wl-865))
     b945 = s.argmin(abs(wl-945))
     b1040 = s.argmin(abs(wl-1040))
-    if not (any(RT.wl > 850) and any(RT.wl < 1050)):
+    if not (any(RT.wl > 900) and any(RT.wl < 980)):
         return x_RT
     x_new = x_RT.copy()
 
@@ -77,13 +77,16 @@ def heuristic_atmosphere(RT, instrument, x_RT, x_instrument,  meas, geom):
             r = 1.0 / (transm / (rho - rhoatm) + sphalb)
             ratios.append((r[b945]*2.0)/(r[b1040]+r[b865]))
             h2os.append(h2o)
+            #print('-------------->',h2o,ratios[-1],rhoatm,transm,sphalb,solar_irr)   
 
+        print(ratios)
         # Finally, interpolate to determine the actual water vapor level that
         # would optimize the continuum-relative correction
         p = interp1d(h2os, ratios)
         bounds = (h2os[0]+0.001, h2os[-1]-0.001)
         best = min1d(lambda h: abs(1-p(h)), bounds=bounds, method='bounded')
         x_new[ind_sv] = best.x
+        print(x_new,'!!!!!!!!!')
     return x_new
 
 

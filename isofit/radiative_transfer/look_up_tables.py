@@ -168,16 +168,17 @@ class TabularRT:
         self.rhoatm_interp = VectorInterpolatorJIT(self.lut_grids, self.rhoatm)
         self.sphalb_interp = VectorInterpolatorJIT(self.lut_grids, self.sphalb)
         self.transm_interp = VectorInterpolatorJIT(self.lut_grids, self.transm)
-        self.transup_interp = VectorInterpolatorJIT(
-            self.lut_grids, self.transm)
+        self.transup_interp = VectorInterpolatorJIT(self.lut_grids, self.transm)
 
     def lookup_lut(self, point):
         """Multi-linear interpolation in the LUT"""
-
         rhoatm = s.array(self.rhoatm_interp(point)).ravel()
         sphalb = s.array(self.sphalb_interp(point)).ravel()
         transm = s.array(self.transm_interp(point)).ravel()
         transup = s.array(self.transup_interp(point)).ravel()
+       #print('((transm))',point,transm)
+       #print('((sphalb))',point,sphalb)
+       #print('((rhoatm))',point,rhoatm)
         return rhoatm, sphalb, transm, transup
 
     def get(self, x_RT, geom):
@@ -253,7 +254,7 @@ class TabularRT:
         K_surface = []
         for i in range(len(x_surface)):
             drho_drfl = \
-                (transm/(1-sphalb*rfl)-(sphalb*transm*rfl)/pow(1-sphalb*rfl, 2))
+                (transm/(1-sphalb*rfl)+(sphalb*transm*rfl)/pow(1-sphalb*rfl, 2))
             drdn_drfl = drho_drfl/s.pi*(self.solar_irr*self.coszen)
             drdn_dLs = transup
             K_surface.append(drdn_drfl * drfl_dsurface[:, i] +

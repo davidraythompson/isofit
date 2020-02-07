@@ -152,7 +152,7 @@ def emissive_radiance(emissivity, T, wl):
     return uW_per_cm2_sr_nm, dRdn_dT
 
 
-@jit
+#@jit
 def chol_inv(C):
     """Fast stable inverse for Hermetian positive definite matrices"""
 
@@ -161,14 +161,14 @@ def chol_inv(C):
     return S.dot(S.T)
 
 
-@jit
+#@jit
 def svd_inv(C, mineig=0, hashtable=None):
     """Fast stable inverse using SVD.  This can handle near-singular matrices"""
 
     return svd_inv_sqrt(C, mineig, hashtable)[0]
 
 
-@jit
+#@jit
 def svd_inv_sqrt(C, mineig=0, hashtable=None):
     """Fast stable inverse using SVD. This can handle near-singular matrices.
        Also return the square root."""

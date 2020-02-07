@@ -79,6 +79,16 @@ class Instrument:
             # is signal-independnet and applied uniformly to all wavelengths
             self.model_type = 'SNR'
             self.snr = float(config['SNR'])
+            
+        elif 'channelized_snr_file' in config:
+            self.model_type = 'channelized_snr'
+            self.channelized_snr = s.loadtxt(config['channelized_snr_file'])
+            
+        elif 'covariance_file' in config:
+            self.model_type = 'covariance'
+            self.covariance_file = config['covariance_file']
+            D = loadmat(self.covariance_file)
+            self.noise_covariance = D['covariance']
 
         elif 'parametric_noise_file' in config:
 
@@ -98,6 +108,7 @@ class Instrument:
                                   for w in self.wl_init])
 
         elif 'pushbroom_noise_file' in config:
+
             # The third option is a full pushbroom noise model that
             # specifies noise columns and covariances independently for
             # each cross-track location via an ENVI-format binary data file.
@@ -186,6 +197,13 @@ class Instrument:
             meas[bad] = 1e-5
             nedl = (1.0 / self.snr) * meas
             return pow(s.diagflat(nedl), 2)
+
+        elif self.model_type == 'channelized_snr':
+            nedl = s.diagflat(meas/self.channelized_snr)
+            return pow(nedl,2)
+
+        elif self.model_type == 'covariance':
+            return self.noise_covariance 
 
         elif self.model_type == 'parametric':
             nedl = abs(

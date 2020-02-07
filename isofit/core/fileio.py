@@ -1,5 +1,4 @@
-#! /usr/bin/env python3
-#
+#! /usr/bin/env python3 #
 #  Copyright 2018 California Institute of Technology
 #
 #  Licensed under the Apache License, Version 2.0 (the "License");
@@ -259,6 +258,9 @@ class IO:
         if 'logging' in config:
             logging.config.dictConfig(config)
 
+        if self.output['plot_surface_components']:
+           logging.info('plotting surface components')
+           
         # A list of all possible input data sources
         self.possible_inputs = [
             "measured_radiance_file",
@@ -273,6 +275,7 @@ class IO:
             "rt_prior_variance_file",
             "instrument_prior_mean_file",
             "instrument_prior_variance_file",
+            "radiometry_offset_file",
             "radiometry_correction_file"
         ]
 
@@ -281,6 +284,10 @@ class IO:
         # "Data dump file", etc.
         wl_names = [('Channel %i' % i) for i in range(self.n_chan)]
         sv_names = self.fm.statevec.copy()
+        cov_names = []
+        for ci in s.arange(self.n_sv):
+            for cj in s.arange(self.n_sv):
+                cov_names.append('%i,%i'%(ci,cj))
         self.output_info = {
             "estimated_state_file":
                 (sv_names,
@@ -329,6 +336,10 @@ class IO:
             "posterior_uncertainty_file":
                 (sv_names,
                  '{State Parameter, Value}',
+                 '{}'),
+            "posterior_covariance_file":
+                (cov_names,
+                 '{}',
                  '{}')}
 
         self.defined_outputs, self.defined_inputs = {}, {}
@@ -362,6 +373,9 @@ class IO:
                                                 ztitles=ztitle)
 
         # Do we apply a radiance correction?
+        if 'radiometry_offset_file' in self.input:
+            filename = self.input['radiometry_offset_file']
+            self.radiance_offset, wl = load_spectrum(filename)
         if 'radiometry_correction_file' in self.input:
             filename = self.input['radiometry_correction_file']
             self.radiance_correction, wl = load_spectrum(filename)
@@ -415,6 +429,8 @@ class IO:
 
         # We apply the calibration correciton here for simplicity.
         meas = data['measured_radiance_file']
+        if data["radiometry_offset_file"] is not None:
+            meas = meas.copy() + data['radiometry_offset_file']
         if data["radiometry_correction_file"] is not None:
             meas = meas.copy() * data['radiometry_correction_file']
 
@@ -460,9 +476,10 @@ class IO:
         if len(states) == 0:
 
             # Write a bad data flag
-            atm_bad = s.zeros(len(self.fm.statevec)) * -9999.0
-            state_bad = s.zeros(len(self.fm.statevec)) * -9999.0
-            data_bad = s.zeros(self.fm.instrument.n_chan) * -9999.0
+            atm_bad = s.zeros(self.n_sv) * -9999.0
+            state_bad = s.zeros(self.n_sv) * -9999.0
+            data_bad = s.zeros(self.n_chan) * -9999.0
+            covariance_bad = s.zeros(self.n_sv**2) * -9999.0
             to_write = {
                 'estimated_state_file': state_bad,
                 'estimated_reflectance_file': data_bad,
@@ -475,7 +492,8 @@ class IO:
                 'atmospheric_coefficients_file': atm_bad,
                 'radiometry_correction_file': data_bad,
                 'spectral_calibration_file': data_bad,
-                'posterior_uncertainty_file': state_bad
+                'posterior_uncertainty_file': state_bad,
+                'posterior_covariance_file': covariance_bad
             }
 
         else:
@@ -549,7 +567,8 @@ class IO:
                 'atmospheric_coefficients_file': atm,
                 'radiometry_correction_file': factors,
                 'spectral_calibration_file': cal,
-                'posterior_uncertainty_file': s.sqrt(s.diag(S_hat))
+                'posterior_uncertainty_file': s.sqrt(s.diag(S_hat)),
+                'posterior_covariance_file': S_hat.flatten()
             }
 
         for product in self.outfiles:
@@ -680,6 +699,7 @@ class IO:
                     # green and blue lines - surface components
                     if hasattr(self.fm.surface, 'components') and \
                             self.output['plot_surface_components']:
+
                         idx = s.where(s.logical_and(self.fm.surface.wl > lo,
                                                     self.fm.surface.wl < hi))[0]
                         p3 = plt.plot(self.fm.surface.wl[idx],

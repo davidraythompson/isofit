@@ -37,6 +37,7 @@ class LibRadTranRT(TabularRT):
         self.libradtran_dir = self.find_basedir(config)
         self.libradtran_template_file = config['libradtran_template_file']
         self.build_lut()
+        print(self.statevec, self.lut_names)
 
     def find_basedir(self, config):
         '''Seek out a libradtran base directory'''

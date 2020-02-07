@@ -115,6 +115,8 @@ def surface_model(config):
 
             # import spectra and resample
             for x1 in x:
+                if not s.any(x1>0.01):
+                    continue
                 p = interp1d(swl, x1, kind='linear', bounds_error=False,
                              fill_value='extrapolate')
                 spectra.append(p(wl))
