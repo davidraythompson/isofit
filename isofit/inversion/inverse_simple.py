@@ -206,7 +206,7 @@ def invert_simple(forward, meas, geom):
             T = z
             emissivity = forward.surface.emissivity_for_surface_T_init
             Ls_est, d = emissive_radiance(emissivity, T,
-                                          forward.surface.wl[clearest_indices])
+                                          forward.RT.wl[clearest_indices])
             resid = transup[clearest_indices] * Ls_est + \
                 L_total_without_surface_emission[clearest_indices] - \
                 meas[clearest_indices]
@@ -224,6 +224,7 @@ def invert_simple(forward, meas, geom):
     # Update the full state vector
     x[forward.idx_surface] = x_surface
 
+    
     # We record these initial values in the geometry object - the only
     # "stateful" part of the retrieval
     geom.x_surf_init = x[forward.idx_surface]

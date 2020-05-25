@@ -210,6 +210,8 @@ def surface_model(config):
             if len(attributes)>0:
                 m_attr = s.mean(spectra_attr[Z == ci, :], axis=0)
                 C_attr = s.cov(spectra_attr[Z == ci, :], rowvar=False)
+                for i in range(C_attr.shape[0]):
+                    C_attr[i,i] = C_attr[i,i] + 1e-6 # A wee bit of regularization here
 
             for i in range(nchan):
                 window = windows[window_idx[i]]
