@@ -95,6 +95,8 @@ class ModtranRT(TabularRT):
 
         self.last_point_looked_up = np.zeros(self.n_point)
         self.last_point_lookup_values = np.zeros(self.n_point)
+        self.last_deriv_looked_up = np.zeros(self.n_point)
+        self.last_deriv_lookup_values = np.zeros(self.n_point)
 
         # Build the lookup table
         self.build_lut()
@@ -306,7 +308,7 @@ class ModtranRT(TabularRT):
 
 
                     max_water = None
-                    with open(os.path.join(self.lut_dir,filebase + '.tp6')) as tp6file:
+                    with open(os.path.join(self.lut_dir,filebase + '.tp6'), errors='ignore') as tp6file:
                         for count, line in enumerate(tp6file):
                             if 'The water column is being set to the maximum' in line:
                                 max_water = line.split(',')[1].strip()
@@ -480,11 +482,56 @@ class ModtranRT(TabularRT):
 
         return self._lookup_lut(point)
 
+    def get_deriv(self, x_RT, geom):
+        point = np.zeros((self.n_point,))
+        for point_ind, name in enumerate(self.lut_grid_config):
+            if name in self.statevector_names:
+                ix = self.statevector_names.index(name)
+                x_RT_ind = self._full_to_local_statevector_position_mapping[ix]
+                point[point_ind] = x_RT[x_RT_ind]
+            elif name == "OBSZEN":
+                point[point_ind] = geom.OBSZEN
+            elif name == "GNDALT":
+                point[point_ind] = geom.GNDALT
+            elif name == "viewzen":
+                point[point_ind] = geom.observer_zenith
+            elif name == "viewaz":
+                point[point_ind] = geom.observer_azimuth
+            elif name == "solaz":
+                point[point_ind] = geom.solar_azimuth
+            elif name == "solzen":
+                point[point_ind] = geom.solar_zenith
+            elif name == "TRUEAZ":
+                point[point_ind] = geom.TRUEAZ
+            elif name == 'phi':
+                point[point_ind] = geom.phi
+            elif name == 'umu':
+                point[point_ind] = geom.umu
+            else:
+                # If a variable is defined in the lookup table but not
+                # specified elsewhere, we will default to the minimum
+                point[point_ind] = min(self.lut_grid_config[name])
+
+        derivs = dict([(k, s.zeros(len(v),len(self.full_statevector_names)))\
+                for k,v in self._lookup_lut(point).items()])
+        for ix, name in self.full_statevector_names:
+            if name in self.statevector_names:
+                x_RT_ind = self._full_to_local_statevector_position_mapping[ix]
+            
+
+        return derivs
+
     def get_L_atm(self, x_RT, geom):
         if self.treat_as_emissive:
             return self.get_L_atm_tir(x_RT, geom)
         else:
             return self.get_L_atm_vswir(x_RT, geom)
+
+    def get_dL_atm(self, x_RT, geom):
+        if self.treat_as_emissive:
+            return self.get_dL_atm_tir(x_RT, geom)
+        else:
+            return self.get_dL_atm_vswir(x_RT, geom)
 
     def get_L_atm_vswir(self, x_RT, geom):
         r = self.get(x_RT, geom)
@@ -492,15 +539,31 @@ class ModtranRT(TabularRT):
         rdn = rho/np.pi*(self.solar_irr*self.coszen)
         return rdn
 
+    def get_dL_atm_vswir(self, x_RT, geom):
+        dr = self.get_deriv(x_RT, geom)
+        drho = dr['rhoatm']
+        drdn = drho/np.pi*(self.solar_irr*self.coszen)
+        return drdn
+
     def get_L_atm_tir(self, x_RT, geom):
         r = self.get(x_RT, geom)
         return r['thermal_upwelling']
+
+    def get_dL_atm_tir(self, x_RT, geom):
+        dr = self.get_deriv(x_RT, geom)
+        return dr['thermal_upwelling']
 
     def get_L_down_transmitted(self, x_RT, geom):
         if self.treat_as_emissive:
             return self.get_L_down_transmitted_tir(x_RT, geom)
         else:
             return self.get_L_down_transmitted_vswir(x_RT, geom)
+
+    def get_dL_down_transmitted(self, x_RT, geom):
+        if self.treat_as_emissive:
+            return self.get_dL_down_transmitted_tir(x_RT, geom)
+        else:
+            return self.get_dL_down_transmitted_vswir(x_RT, geom)
 
     def get_L_down_transmitted_vswir(self, x_RT, geom):
         r = self.get(x_RT, geom)
@@ -514,10 +577,17 @@ class ModtranRT(TabularRT):
         r = self.get(x_RT, geom)
         return r['thermal_downwelling']
 
-    def get_L_up(self, x_RT, geom):
-        """Thermal emission from the ground is provided by the thermal model, 
-        so this function is a placeholder for future upgrades."""
-        return 0
+    def get_dL_down_transmitted_vswir(self, x_RT, geom):
+        dr = self.get_deriv(x_RT, geom)
+        drdn = (self.solar_irr*self.coszen) / np.pi * dr['transm']
+        return drdn
+
+    def get_L_down_transmitted_tir(self, x_RT, geom):
+        """thermal_downwelling already includes the transmission factor. Also
+        assume there is no multiple scattering for TIR.
+        """
+        dr = self.get_deriv(x_RT, geom)
+        return dr['thermal_downwelling']
 
     def wl2flt(self, wls, fwhms, outfile):
         """Helper function to generate Gaussian distributions around the 

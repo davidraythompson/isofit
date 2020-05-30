@@ -309,8 +309,3 @@ class LibRadTranRT(TabularRT):
         r = self.get(x_RT, geom)
         rdn = (self.solar_irr * self.coszen) / np.pi * r['transm']
         return rdn
-
-    def get_L_up(self, x_RT, geom):
-        """Thermal emission from the ground is provided by the thermal model, so
-        this function is a placeholder for future upgrades."""
-        return 0

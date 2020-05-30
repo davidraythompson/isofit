@@ -114,13 +114,21 @@ class RadiativeTransfer():
 
         return self.pack_arrays(ret)
 
+    def get_deriv(self, x_RT, geom):
+
+        ret = []
+        for RT in self.rt_engines:
+            ret.append(RT.get_deriv(x_RT, geom))
+
+        return self.pack_2d_arrays(ret)
+
+
     def calc_rdn(self, x_RT, rfl, Ls, geom):
         r = self.get(x_RT, geom)
         L_atm = self.get_L_atm(x_RT, geom)
         L_down_transmitted = self.get_L_down_transmitted(x_RT, geom)
 
-        L_up = self.get_L_up(x_RT, geom)
-        L_up = L_up + Ls * r['transup']
+        L_up =  Ls * r['transup']
 
         ret = L_atm + \
             L_down_transmitted * rfl / (1.0 - r['sphalb'] * rfl) + \
@@ -134,35 +142,50 @@ class RadiativeTransfer():
             L_atms.append(RT.get_L_atm(x_RT, geom))
         return np.hstack(L_atms)
 
+    def get_dL_atm(self, x_RT, geom):
+        dL_atms = []
+        for RT in self.rt_engines:
+            dL_atms.append(RT.get_dL_atm(x_RT, geom))
+        return np.concatenate(dL_atms, axis=0)
+
     def get_L_down_transmitted(self, x_RT, geom):
         L_downs = []
         for RT in self.rt_engines:
             L_downs.append(RT.get_L_down_transmitted(x_RT, geom))
         return np.hstack(L_downs)
 
-    def get_L_up(self, x_RT, geom):
-        '''L_up is provided by the surface model, so just return
-        0 here. The commented out code here is for future updates.'''
-        #L_ups = []
-        # for key, RT in self.RTs.items():
-        #    L_ups.append(RT.get_L_up(x_RT, geom))
-        # return s.hstack(L_ups)
-
-        return 0.
+    def get_dL_down_transmitted(self, x_RT, geom):
+        dL_downs = []
+        for RT in self.rt_engines:
+            dL_downs.append(RT.get_dL_down_transmitted(x_RT, geom))
+        return np.concatenate(dL_downs, axis=0)
 
     def drdn_dRT(self, x_RT, x_surface, rfl, drfl_dsurface, Ls,
                  dLs_dsurface, geom):
 
+        # derivative of radiance WRT each state vector element
+        K_RT = s.array([]).reshape((0,len(x_RT)))
+        dr = self.get_deriv(x_RT, geom)
+        r = self.get(x_RT, geom)
+
+        dL_atm = self.get_dL_atm(x_RT, geom) # nchan x nsv
+        dL_down_transmitted = self.get_dL_down_transmitted(x_RT, geom)
+        L_down_transmitted = self.get_L_down_transmitted(x_RT, geom)
+        dL_up = Ls * dr['transup']
+
+        drdn_dRT = dL_atm + \
+            dL_down_transmitted * rfl / (1.0 - r['sphalb'] * rfl) + \
+            L_down_transmitted * rfl / pow(1.0 - r['sphalb'] * rfl, 2) * (rfl * dr['sphalab'])+ \
+            dL_up
+ 
         # first the rdn at the current state vector
         rdn = self.calc_rdn(x_RT, rfl, Ls, geom)
-
-        # perturb each element of the RT state vector (finite difference)
-        K_RT = []
+        K_RT_finitediff = []
         x_RTs_perturb = x_RT + np.eye(len(x_RT))*eps
         for x_RT_perturb in list(x_RTs_perturb):
             rdne = self.calc_rdn(x_RT_perturb, rfl, Ls, geom)
-            K_RT.append((rdne-rdn) / eps)
-        K_RT = np.array(K_RT).T
+            K_RT_finitediff.append((rdne-rdn) / eps)
+        K_RT_finitediff = np.array(K_RT_finitediff).T
 
         # Get K_surface
         r = self.get(x_RT, geom)
@@ -222,4 +245,14 @@ class RadiativeTransfer():
         for key in list_of_r_dicts[0].keys():
             temp = [x[key] for x in list_of_r_dicts]
             r_stacked[key] = np.hstack(temp)
+        return r_stacked
+
+    def pack_2d_arrays(self, list_of_r_dicts):
+        """Take the list of dict outputs from each RTM (in order of RTs) and
+        stack their internal arrays in the same order.
+        """
+        r_stacked = {}
+        for key in list_of_r_dicts[0].keys():
+            temp = [x[key] for x in list_of_r_dicts]
+            r_stacked[key] = np.concatenate(temp, axis=0)
         return r_stacked
