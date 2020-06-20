@@ -141,22 +141,24 @@ class ModtranRT(TabularRT):
         """Load a '.chn' output file and parse critical coefficient vectors. 
 
            These are:
-             wl      - wavelength vector
-             sol_irr - solar irradiance
-             sphalb  - spherical sky albedo at surface
-             transm  - diffuse and direct irradiance along the 
+             * wl      - wavelength vector
+             * sol_irr - solar irradiance
+             * sphalb  - spherical sky albedo at surface
+             * transm  - diffuse and direct irradiance along the
                           sun-ground-sensor path
-             transup - transmission along the ground-sensor path only 
+             * transup - transmission along the ground-sensor path only
 
-            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-             Be careful with these! They are to be used only by the 
-             modtran_tir functions because MODTRAN must be run with a 
-             reflectivity of 1 for them to be used in the RTM defined
-             in radiative_transfer.py.
-             thermal_upwelling - atmospheric path radiance
-             thermal_downwelling - sky-integrated thermal path radiance 
+           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            Be careful with these! They are to be used only by the
+            modtran_tir functions because MODTRAN must be run with a
+            reflectivity of 1 for them to be used in the RTM defined
+            in radiative_transfer.py.
+
+            * thermal_upwelling - atmospheric path radiance
+            * thermal_downwelling - sky-integrated thermal path radiance
                 reflected off the ground and back into the sensor.
-            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
            We parse them one wavelength at a time."""
 
@@ -306,7 +308,7 @@ class ModtranRT(TabularRT):
 
 
                     max_water = None
-                    with open(os.path.join(self.lut_dir,filebase + '.tp6')) as tp6file:
+                    with open(os.path.join(self.lut_dir,filebase + '.tp6'), errors='ignore') as tp6file:
                         for count, line in enumerate(tp6file):
                             if 'The water column is being set to the maximum' in line:
                                 max_water = line.split(',')[1].strip()
@@ -453,8 +455,7 @@ class ModtranRT(TabularRT):
         for point_ind, name in enumerate(self.lut_grid_config):
             if name in self.statevector_names:
                 ix = self.statevector_names.index(name)
-                x_RT_ind = self._full_to_local_statevector_position_mapping[ix]
-                point[point_ind] = x_RT[x_RT_ind]
+                point[point_ind] = x_RT[ix]
             elif name == "OBSZEN":
                 point[point_ind] = geom.OBSZEN
             elif name == "GNDALT":
@@ -513,11 +514,6 @@ class ModtranRT(TabularRT):
         """
         r = self.get(x_RT, geom)
         return r['thermal_downwelling']
-
-    def get_L_up(self, x_RT, geom):
-        """Thermal emission from the ground is provided by the thermal model, 
-        so this function is a placeholder for future upgrades."""
-        return 0
 
     def wl2flt(self, wls, fwhms, outfile):
         """Helper function to generate Gaussian distributions around the 
