@@ -178,7 +178,7 @@ class ModtranRT(TabularRT):
                     np.pi / wid / coszen  # uW/nm/sr/cm2
                 rdnatm = float(toks[4]) * 1e6  # uW/nm/sr/cm2
                 rhoatm = rdnatm * np.pi / (solar_irr * coszen)
-                sphalb = float(toks[23])
+                Ephalb = float(toks[23])
                 transm = float(toks[22]) + float(toks[21])
                 transup = float(toks[24])
 
@@ -238,6 +238,16 @@ class ModtranRT(TabularRT):
             elif key in ['ITYPE', 'H1ALT', 'IDAY', 'IPARM', 'PARM1',
                          'PARM2', 'GMTIME', 'TRUEAZ', 'OBSZEN']:
                 param[0]['MODTRANINPUT']['GEOMETRY'][key] = val
+
+            elif key == 'VPROFILE':
+                if val<0.25:
+                    profile = 'ATM_SUBARC_WINTER'
+                elif val>0.75:
+                    profile = 'ATM_TROPICAL'
+                else:
+                    profile = 'ATM_MIDLAT_SUMMER'
+                for field in ['M1','M2','M3','M4','M5','M6','MODEL']:
+                    param[0]['MODTRANINPUT']['ATMOSPHERE'][field] = profile
 
         # For custom aerosols, specify final extinction and absorption
         # MODTRAN 6.0 convention treats negative visibility as AOT550
