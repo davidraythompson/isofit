@@ -178,7 +178,7 @@ class ModtranRT(TabularRT):
                     np.pi / wid / coszen  # uW/nm/sr/cm2
                 rdnatm = float(toks[4]) * 1e6  # uW/nm/sr/cm2
                 rhoatm = rdnatm * np.pi / (solar_irr * coszen)
-                Ephalb = float(toks[23])
+                sphalb = float(toks[23])
                 transm = float(toks[22]) + float(toks[21])
                 transup = float(toks[24])
 
@@ -239,6 +239,10 @@ class ModtranRT(TabularRT):
                          'PARM2', 'GMTIME', 'TRUEAZ', 'OBSZEN']:
                 param[0]['MODTRANINPUT']['GEOMETRY'][key] = val
 
+            elif key == 'ABL':
+                param[0]['MODTRANINPUT']['AEROSOLS']['REGALT']['ZAER1'][1] =\
+                  val
+                
             elif key == 'VPROFILE':
                 if val<0.25:
                     profile = 'ATM_SUBARC_WINTER'
