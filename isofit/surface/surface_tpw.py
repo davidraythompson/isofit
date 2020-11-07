@@ -21,6 +21,7 @@
 import numpy as np
 from scipy.linalg import block_diag, norm
 from scipy.io import loadmat
+from scipy.optimize import minimize
 
 from ..core.common import svd_inv, VectorInterpolator
 from .surface import Surface
@@ -55,9 +56,15 @@ class TPWSurface(Surface):
         self.init = []
         self.idx_lamb = []
         rmin, rmax = 0, 100.0
+
+        for wi,(lo,hi) in enumerate(self.windows):
+            blo = np.argmin(abs(self.wl-lo))
+            bhi = np.argmin(abs(self.wl-hi))
+            self.window_idx.append((blo,bhi))
+
         for i in np.arange(self.n_wl):
             lamb = True
-            for self.wi,(lo,hi) in enumerate(self.windows):
+            for self.wi,(lo,hi) in enumerate(self.window_idx):
                 if self.wl[i]>=lo and self.wl[i]<hi:
                     lamb = False
             if lamb:
@@ -69,18 +76,13 @@ class TPWSurface(Surface):
         self.idx_lamb = np.array(self.idx_lamb)
 
         # Variables retrieved: each channel maps to a reflectance model parameter
-        for wi,(lo,hi) in enumerate(self.windows):
+        for wi,(blo,bhi) in enumerate(self.window_idx):
             self.init = self.init + [1e-6,1e-6,1e-6,1e-6]
             self.scale = self.scale + [1,1,1,1]
             self.bounds = self.bounds + [[-100,100],[-100,100],[0,100],[0,100]]
             self.statevec_names = self.statevec_names + \
                 ['WIN%i_OFFS'%wi,'WIN%i_SLOPE'%wi,
                  'WIN%i_LQD'%wi,'WIN%i_ICE'%wi]
-            blo = np.argmin(abs(self.wl-lo))
-            bhi = np.argmin(abs(self.wl-hi))
-            self.window_idx.append((blo,bhi))
-            self.lqd_abscf.append(self.lqd[blo:bhi])
-            self.ice_abscf.append(self.ice[blo:bhi])
         
         self.n_lamb = len(self.idx_lamb)
         self.n_state = len(self.statevec_names)
@@ -95,20 +97,35 @@ class TPWSurface(Surface):
     def Sa(self, x_surface, geom):
         """Covariance of prior distribution, calculated at state x."""
 
-        sigma = np.ones(self.n_state)*10
+        sigma = np.ones(self.n_state)*1000
         variance = pow(sigma,2)
         return np.diag(variance)
 
     def fit_params(self, rfl_meas, geom, *args):
         """Given a reflectance estimate, fit a state vector."""
 
+        def err(x, transm, blo, bhi):
+            lqd, ice = x
+            transm_est = np.exp(-ice*self.ice[blo:bhi]) *\
+                            np.exp(-lqd*self.lqd[blo:bhi])
+            return np.sum(pow(transm-transm_est,2))
+
         x_surface = np.zeros(self.n_state)
         for i,li in enumerate(self.idx_lamb):
             x_surface[i] = rfl_meas[li]
         for wi, (blo, bhi) in enumerate(self.window_idx):
-            x_surface[self.n_lamb+wi*4] = rfl_meas[blo]
-            x_surface[self.n_lamb+wi*4+1] = (rfl_meas[bhi]-rfl_meas[blo]) \
+            offs = rfl_meas[blo]
+            slp = (rfl_meas[bhi]-rfl_meas[blo]) \
                     / float(bhi-blo)
+            x_surface[self.n_lamb+wi*4+1] = slp
+            x_surface[self.n_lamb+wi*4] = offs
+            continuum = offs + slp*np.arange(bhi-blo)
+            ctmrm = rfl_meas[blo:bhi] / continuum
+            x0 = [0,0]
+            res = minimize(err, x0, args=(ctmrm,blo,bhi))
+            lqd, ice = res.x
+            x_surface[self.n_lamb+wi*4+2] = lqd
+            x_surface[self.n_lamb+wi*4+3] = ice
         return x_surface
 
     def calc_rfl(self, x_surface, geom):
@@ -144,6 +161,7 @@ class TPWSurface(Surface):
             dlamb[li,i] = 1.0
         for wi, (blo, bhi) in enumerate(self.window_idx):
             offs,slp,lqd,ice = x_surface[(self.n_lamb+wi*4):(self.n_lamb+(wi+1)*4)]
+            continuum = offs + slp*np.arange(bhi-blo)
             lqd_abs = np.exp(-lqd*self.lqd[blo:bhi])
             ice_abs = np.exp(-ice*self.ice[blo:bhi])
             dlqd_abs_dstate = -self.lqd[blo:bhi]*np.exp(-lqd*self.lqd[blo:bhi])
@@ -151,9 +169,9 @@ class TPWSurface(Surface):
             dlamb[blo:bhi,self.n_lamb+wi*4] = ice_abs * lqd_abs
             dlamb[blo:bhi,self.n_lamb+wi*4+1] = np.arange(bhi-blo) * ice_abs * lqd_abs
             dlamb[blo:bhi,self.n_lamb+wi*4+2] = \
-                (offs + slp*np.arange(bhi-blo)) * ice_abs * dlqd_abs_dstate
+                continuum * ice_abs * dlqd_abs_dstate
             dlamb[blo:bhi,self.n_lamb+wi*4+3] = \
-                (offs + slp*np.arange(bhi-blo)) * lqd_abs * dice_abs_dstate
+                continuum * lqd_abs * dice_abs_dstate
         return dlamb
                                                              
     def calc_Ls(self, x_surface, geom):
