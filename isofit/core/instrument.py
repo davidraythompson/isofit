@@ -172,11 +172,12 @@ class Instrument:
         Returns: Sy, the measurement error covariance due to instrument noise
         """
         if self.model_type == 'SNR':
-            bad = meas < 1e-5
+            nedl = (1.0 / self.snr) * meas
+            noise_limit = np.sqrt(1e-7) # From Kelvin Leung
+            bad = nedl < noise_limit
             if np.any(bad):
                 logging.debug('SNR noise model found noise <= 0 - adjusting to slightly positive to avoid /0.')
-            nedl = (1.0 / self.snr) * meas
-            nedl[bad] = 1/self.snr * 1e-5
+            nedl[bad] = noise_limit
             return np.diagflat(np.power(nedl,2))
 
         elif self.model_type == 'parametric':
