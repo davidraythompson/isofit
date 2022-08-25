@@ -122,6 +122,7 @@ def main(rawargs=None):
     parser.add_argument('--ray_temp_dir', type=str, default='/tmp/ray')
     parser.add_argument('--emulator_base', type=str, default=None)
     parser.add_argument('--segmentation_size', type=int, default=40)
+    parser.add_argument('--nneighbors', type=int, default=-1)
 
     args = parser.parse_args(rawargs)
 
@@ -362,9 +363,14 @@ def main(rawargs=None):
     if not exists(paths.rfl_working_path) or not exists(paths.uncert_working_path):
         # Empirical line
         logging.info('Empirical line inference')
-        # Determine the number of neighbors to use.  Provides backwards stability and works
-        # well with defaults, but is arbitrary
-        nneighbors = int(round(3950 / 9 - 35/36 * args.segmentation_size))
+
+        # Determine the number of neighbors to use.  
+        if args.nneighbors < 0:
+            # Provides backwards stability and works well with defaults, but is arbitrary
+            nneighbors = int(round(3950 / 9 - 35/36 * args.segmentation_size))
+        else:
+            nneighbors = args.nneighbors       # Determine the number of neighbors to use.  Provides backwards stability and works
+        
         empirical_line(reference_radiance_file=paths.rdn_subs_path,
                        reference_reflectance_file=paths.rfl_subs_path,
                        reference_uncertainty_file=paths.uncert_subs_path,
