@@ -76,9 +76,9 @@ class Instrument:
         self.integrations = config.integrations
 
         if config.eof_path is not None:
-           self.eof = np.loadtxt(config.eof_path)
+            self.eof = np.loadtxt(config.eof_path)
         else:
-           self.eof = None
+            self.eof = None
 
         self.dn_uncertainty_embedding = None
         if (
