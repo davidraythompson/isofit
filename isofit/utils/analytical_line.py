@@ -531,10 +531,10 @@ class Worker(object):
             x_instrument = self.subs_state[int(self.lbl[r, c, 0]), 0, inst_idx]
             sub_state = self.subs_state[int(self.lbl[r, c, 0]), 0, iv_idx]
 
-            if 'EOF' in self.fm.statevec:
-                eof_idx = self.fm.statevec.index('EOF')
+            if "EOF" in self.fm.statevec:
+                eof_idx = self.fm.statevec.index("EOF")
                 eof = self.fm.instrument.eof
-                meas = meas - eof * self.subs_state[int(self.lbl[r,c,0]),0,eof_idx]
+                meas = meas - eof * self.subs_state[int(self.lbl[r, c, 0]), 0, eof_idx]
 
             # Note: concatenation only works with the correct indexing.
             sub_state = np.concatenate([sub_state, x_RT, x_instrument])
