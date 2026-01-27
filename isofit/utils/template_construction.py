@@ -1209,15 +1209,18 @@ def build_main_config(
             "eof_path"
         ] = paths.eof_working_path
 
-        isofit_config_modtran["forward_model"]["instrument"]["statevector"] = {
-            "EOF": {
+        # Add a state vector element for each column in the EOF file
+        eof = np.loadtxt(paths.eof_path)
+        isofit_config_modtran["forward_model"]["instrument"]["statevector"] = {}
+        for idx in range(eof.shape[1]):
+            key = "EOF_%i" % (idx + 1)
+            isofit_config_modtran["forward_model"]["instrument"]["statevector"][key] = {
                 "bounds": [-10, 10],
                 "scale": 1,
                 "init": 0,
                 "prior_sigma": 100.0,
                 "prior_mean": 0,
             }
-        }
 
     if paths.input_model_discrepancy_path is not None:
         isofit_config_modtran["forward_model"][
