@@ -770,14 +770,16 @@ def apply_oe(
         logging.info("Writing main configuration file.")
 
         # add aerosol elements from climatology
-        aerosol_state_vector, aerosol_lut_grid, aerosol_model_path = (
-            tmpl.load_climatology(
-                paths.aerosol_climatology,
-                mean_latitude,
-                mean_longitude,
-                dt,
-                lut_params=lut_params,
-            )
+        (
+            aerosol_state_vector,
+            aerosol_lut_grid,
+            aerosol_model_path,
+        ) = tmpl.load_climatology(
+            paths.aerosol_climatology,
+            mean_latitude,
+            mean_longitude,
+            dt,
+            lut_params=lut_params,
         )
         config_params["aerosol_model_file"] = aerosol_model_path
         config_params["aerosol_lut_grid"] = aerosol_lut_grid
@@ -803,7 +805,6 @@ def apply_oe(
                 mean_relative_azimuth,
             ],
         ):
-
             config_params[gridkey] = grid if grid is not None else [mean]
 
         config_params["multiple_restarts"] = (multiple_restarts,)

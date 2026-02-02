@@ -279,9 +279,7 @@ class Pathnames:
                     env.path("data", "emit_model_discrepancy.mat")
                 )
             if self.eof_path is None:
-                self.eof_path = str(
-                    env.path("data", "emit_eofs.txt")
-                )
+                self.eof_path = str(env.path("data", "emit_eofs.txt"))
         elif sensor == "tanager":
             self.noise_path = str(env.path("data", "tanager1_noise_20241016.txt"))
 
