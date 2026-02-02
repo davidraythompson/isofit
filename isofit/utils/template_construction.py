@@ -897,6 +897,10 @@ def build_config(
             "isofit_version": __version__,
         },
     }
+    if eof_path is not None:
+        isofit_config_modtran["forward_model"]["instrument"][
+            "eof_path"
+        ] = paths.eof_working_path
 
     input, output = {}, {}
     if use_superpixels:
