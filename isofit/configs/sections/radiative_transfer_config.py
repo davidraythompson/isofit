@@ -366,7 +366,7 @@ class RadiativeTransferConfig(BaseConfigSection):
         self.radiative_transfer_engines = []
 
         self._terrain_style_type = str
-        self.terrain_style = "flat"
+        self.terrain_style = "dem"
         """
         Style of terrain to use in the forward model - options are 'flat', 'dem', 'solved'
         """

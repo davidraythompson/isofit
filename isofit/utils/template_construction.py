@@ -701,7 +701,7 @@ def build_config(
         relative_azimuth_lut_grid:            the relative to-sun azimuth angle look up table grid isofit should use for
                                               this solve
         co2_lut_grid:                         CO2 look up table grid
-        aerosol_lut_grid:                      aerosol look up table grid
+        aerosol_lut_grid:                     aerosol look up table grid
         aerosol_model_file:                   aerosol model file path
         aerosol_state_vector:                 aerosol state vector info
         use_superpixels:                      flag whether or not to use superpixels for the solution
@@ -709,7 +709,7 @@ def build_config(
         surface_category:                     type of surface to use
         emulator_base:                        the basename of the emulator, if used
         uncorrelated_radiometric_uncertainty: uncorrelated radiometric uncertainty parameter for isofit
-        dn_uncertainty_file:                       Path to a linearity .mat file to augment S matrix with linearity uncertainty
+        dn_uncertainty_file:                  Path to a linearity .mat file to augment S matrix with linearity uncertainty
         multiple_restarts:                    if true, use multiple restarts
         segmentation_size:                    image segmentation size if empirical line is used
         pressure_elevation:                   if true, retrieve pressure elevation
