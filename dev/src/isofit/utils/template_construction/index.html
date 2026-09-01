@@ -7026,7 +7026,13 @@
 <span class="normal">1993</span>
 <span class="normal">1994</span>
 <span class="normal">1995</span>
-<span class="normal">1996</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="ch">#! /usr/bin/env python3</span>
+<span class="normal">1996</span>
+<span class="normal">1997</span>
+<span class="normal">1998</span>
+<span class="normal">1999</span>
+<span class="normal">2000</span>
+<span class="normal">2001</span>
+<span class="normal">2002</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="ch">#! /usr/bin/env python3</span>
 <span class="c1">#</span>
 <span class="c1"># Authors: Philip G. Brodrick and Niklas Bohn</span>
 <span class="c1">#</span>
@@ -8537,6 +8543,7 @@
     <span class="n">relative_azimuth_lut_grid</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">to_sensor_zenith_lut_grid</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">to_sun_zenith_lut_grid</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">unknowns</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{},</span>
 <span class="p">):</span>
     <span class="n">avc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span>
         <span class="p">[</span>
@@ -8575,7 +8582,12 @@
         <span class="p">},</span>
         <span class="s2">"statevector"</span><span class="p">:</span> <span class="p">{},</span>
         <span class="s2">"lut_grid"</span><span class="p">:</span> <span class="p">{},</span>
-        <span class="s2">"unknowns"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"H2O_ABSCO"</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">},</span>
+        <span class="c1"># Previously configured an H2O_ABSCO, but a value effectively turns off</span>
+        <span class="c1"># the uncertainty quantification:</span>
+        <span class="c1"># "unknowns": {"H2O_ABSCO": 0.0},</span>
+        <span class="c1"># We now inherit from the kwargs. Could be hooked up to apply_oe in</span>
+        <span class="c1"># the future.</span>
+        <span class="s2">"unknowns"</span><span class="p">:</span> <span class="n">unknowns</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">atmosphere_rte</span> <span class="o">=</span> <span class="p">{}</span>
